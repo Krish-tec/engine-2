@@ -44,6 +44,18 @@ STRATEGY_LABELS = {
     2: "Hybrid Radial-Transverse Emergency Burn (±R/±T)",
     3: "Hold / No-Burn Safe Pass",
 }
+HUMAN_STRATEGY_TITLES = {
+    0: "Speed Up to Pass Ahead (Along-Track)",
+    1: "Sidestep Orbit (Cross-Track Normal)",
+    2: "Emergency Radial Burst (High Separation)",
+    3: "Maintain Current Course (Safe Pass)",
+}
+HUMAN_STRATEGY_DESCRIPTIONS = {
+    0: "Fires prograde thrusters forward 5.1h before encounter. Pulls satellite safely ahead of debris without altering orbital inclination.",
+    1: "Fires thrusters sideways in cross-track plane. Avoids ground-track timing changes and protects scheduled optical imaging passes.",
+    2: "Fires combined radial and along-track burst. Rapidly expands separation for urgent encounters inside 4 hours.",
+    3: "Natural orbit trajectory maintains clearance greater than 5.0 km keep-out sphere. Zero propellant expenditure.",
+}
 AXIS_LABELS = {
     0: "Along-Track (±T)",
     1: "Cross-Track (±N)",
@@ -134,6 +146,9 @@ class ManeuverOutput(BaseModel):
     qubo_approximation_ratio: Optional[float] = None
     safety_verified: bool
     alert_level: str  # "CRITICAL", "WARNING", "NOMINAL"
+    human_title: Optional[str] = None
+    human_description: Optional[str] = None
+    human_risk_ratio: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +355,15 @@ def _optimize(inp: ConjunctionInput) -> ManeuverOutput:
     # Optimal lead time recommendation: use 60 % of available window
     recommended_lead_hrs = round(inp.time_to_tca_hours * 0.6, 2)
 
+    # Human-friendly odds calculation
+    if pc_pre > 0.999:
+        risk_ratio_str = "Certain Impact (1 in 1)"
+    elif pc_pre >= 1e-6:
+        odds = int(round(1.0 / pc_pre))
+        risk_ratio_str = f"1 in {odds:,} chance"
+    else:
+        risk_ratio_str = "Less than 1 in 1,000,000"
+
     return ManeuverOutput(
         conjunction_id=inp.conjunction_id,
         optimal_maneuver_strategy=strategy,
@@ -355,6 +379,9 @@ def _optimize(inp: ConjunctionInput) -> ManeuverOutput:
         qubo_approximation_ratio=qubo_ratio,
         safety_verified=safety_verified,
         alert_level=alert_level,
+        human_title=HUMAN_STRATEGY_TITLES.get(strategy, "Autonomous Thruster Maneuver"),
+        human_description=HUMAN_STRATEGY_DESCRIPTIONS.get(strategy, ""),
+        human_risk_ratio=risk_ratio_str,
     )
 
 

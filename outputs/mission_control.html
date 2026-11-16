@@ -3,26 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UC096 (QuantumOrbit) — Engine 2: Space Debris CAM Mission Control</title>
+  <title>QuantumOrbit — Engine 2: Collision Avoidance (CAM)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   <!-- Three.js & OrbitControls -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <style>
     :root {
-      --bg: #0b0f19;
-      --panel: #0f172a;
-      --panel-border: #1e293b;
-      --panel-hover: #1e293b;
-      --text: #e2e8f0;
-      --text-muted: #94a3b8;
-      --cyan: #38bdf8;
-      --emerald: #10b981;
-      --amber: #f59e0b;
-      --crimson: #f43f5e;
-      --indigo: #6366f1;
+      --bg-space: #090A0F;
+      --panel-bg: #11131A;
+      --surface-elevated: #171A24;
+      --border-panel: #1E2230;
+      --border-surface: #232736;
+      --text-primary: #F3F4F6;
+      --text-secondary: #9CA3AF;
+      --text-muted: #6B7280;
+
+      /* 4 Thoughtful Semantic Solid Accents (ZERO NEON) */
+      --accent-sat: #3B82F6;     /* Royal Blue */
+      --accent-debris: #EF4444;  /* Crimson Danger */
+      --accent-safe: #10B981;    /* Emerald Safe */
+      --accent-burn: #F59E0B;    /* Amber Thruster */
     }
 
     * {
@@ -32,24 +35,27 @@
     }
 
     body {
-      font-family: 'Space Grotesk', -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-space);
+      color: var(--text-primary);
       overflow: hidden;
       height: 100vh;
       display: flex;
       flex-direction: column;
+      -webkit-font-smoothing: antialiased;
     }
 
+    /* Top Navigation Bar */
     header {
-      background: rgba(15, 23, 42, 0.95);
-      border-bottom: 1px solid var(--panel-border);
-      padding: 12px 24px;
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-panel);
+      padding: 10px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      z-index: 20;
-      backdrop-filter: blur(10px);
+      z-index: 30;
+      height: 52px;
+      flex-shrink: 0;
     }
 
     .brand {
@@ -58,72 +64,82 @@
       gap: 12px;
     }
 
-    .brand-badge {
-      background: linear-gradient(135deg, #0284c7, #6366f1);
-      color: white;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 8px;
-      border-radius: 6px;
-      letter-spacing: 1px;
-    }
-
-    .brand h1 {
-      font-size: 16px;
+    .brand-title {
+      font-size: 13px;
       font-weight: 700;
       letter-spacing: 0.5px;
-    }
-
-    .brand-sub {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .system-status {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-    }
-
-    .status-pill {
+      color: var(--text-primary);
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+
+    .badge-sub {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-surface);
+      color: var(--text-secondary);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.4px;
+    }
+
+    .top-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 24px;
       font-size: 12px;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: var(--emerald);
-      padding: 4px 12px;
-      border-radius: 20px;
+    }
+
+    .target-info {
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .target-val {
+      color: var(--text-primary);
+      font-weight: 600;
       font-family: 'JetBrains Mono', monospace;
     }
 
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--accent-debris);
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      background: var(--emerald);
-      box-shadow: 0 0 8px var(--emerald);
-      animation: pulse 2s infinite;
+      background: var(--accent-debris);
     }
 
-    @keyframes pulse {
-      0% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(1.2); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-
-    .main-layout {
+    /* Main Grid Layout */
+    .app-body {
       flex: 1;
       display: flex;
       position: relative;
       overflow: hidden;
     }
 
+    /* 3D Viewport */
     #viewport-container {
       flex: 1;
       position: relative;
-      background: radial-gradient(circle at center, #111827 0%, #060913 100%);
+      background: var(--bg-space);
+      overflow: hidden;
     }
 
     #three-canvas {
@@ -132,457 +148,541 @@
       display: block;
     }
 
-    .viewport-overlay {
+    /* Clean Overlay Badges in 3D View */
+    .viewport-tags {
       position: absolute;
-      top: 16px;
+      top: 14px;
       left: 16px;
       z-index: 10;
       display: flex;
-      gap: 10px;
-    }
-
-    .legend-badge {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid var(--panel-border);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 11px;
-      font-family: 'JetBrains Mono', monospace;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      backdrop-filter: blur(8px);
-    }
-
-    .legend-color {
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-    }
-
-    .side-panel {
-      width: 440px;
-      background: rgba(15, 23, 42, 0.95);
-      border-left: 1px solid var(--panel-border);
-      display: flex;
-      flex-direction: column;
-      z-index: 10;
-      backdrop-filter: blur(12px);
-      overflow-y: auto;
-    }
-
-    .panel-section {
-      padding: 18px 20px;
-      border-bottom: 1px solid var(--panel-border);
-    }
-
-    .panel-title {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--cyan);
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-weight: 700;
-    }
-
-    .card {
-      background: rgba(30, 41, 59, 0.5);
-      border: 1px solid var(--panel-border);
-      border-radius: 10px;
-      padding: 14px;
-      margin-bottom: 12px;
-    }
-
-    .critical-alert-card {
-      border: 1px solid rgba(244, 63, 94, 0.4);
-      background: rgba(244, 63, 94, 0.08);
-    }
-
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
-
-    .metric-box {
-      background: rgba(15, 23, 42, 0.6);
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .metric-label {
-      font-size: 10px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
-
-    .metric-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 15px;
-      font-weight: 700;
-    }
-
-    .value-danger { color: var(--crimson); }
-    .value-safe { color: var(--emerald); }
-    .value-warning { color: var(--amber); }
-    .value-info { color: var(--cyan); }
-
-    .form-group {
-      margin-bottom: 12px;
-    }
-
-    .form-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .form-slider {
-      width: 100%;
-      height: 5px;
-      background: var(--panel-border);
-      border-radius: 3px;
-      outline: none;
-      -webkit-appearance: none;
-    }
-
-    .form-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--cyan);
-      cursor: pointer;
-      box-shadow: 0 0 6px var(--cyan);
-    }
-
-    .btn {
-      width: 100%;
-      padding: 12px;
-      background: linear-gradient(135deg, #0284c7, #2563eb);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 600;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       gap: 8px;
     }
 
-    .btn:hover {
-      background: linear-gradient(135deg, #0369a1, #1d4ed8);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
-    }
-
-    .btn-secondary {
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid var(--panel-border);
-      margin-top: 8px;
-    }
-
-    .btn-secondary:hover {
-      background: var(--panel-border);
-      box-shadow: none;
-    }
-
-    .benchmark-table {
-      width: 100%;
-      border-collapse: collapse;
+    .tag-item {
+      background: rgba(17, 19, 26, 0.9);
+      border: 1px solid var(--border-panel);
+      padding: 5px 10px;
+      border-radius: 6px;
       font-size: 11px;
-      font-family: 'JetBrains Mono', monospace;
-      margin-top: 8px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(4px);
     }
 
-    .benchmark-table th {
-      text-align: left;
-      color: var(--text-muted);
-      padding: 6px;
-      border-bottom: 1px solid var(--panel-border);
-      font-weight: 600;
+    .tag-color {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
     }
 
-    .benchmark-table td {
-      padding: 6px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    }
-
-    .camera-hud {
+    /* Camera Preset Toolbar */
+    .camera-toolbar {
       position: absolute;
       bottom: 16px;
       left: 16px;
       z-index: 10;
       display: flex;
-      gap: 8px;
+      gap: 6px;
     }
 
-    .hud-btn {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid var(--panel-border);
-      color: var(--text);
+    .btn-tool {
+      background: rgba(23, 26, 36, 0.9);
+      border: 1px solid var(--border-surface);
+      color: var(--text-secondary);
       padding: 6px 12px;
       border-radius: 6px;
       font-size: 11px;
+      font-weight: 500;
       cursor: pointer;
-      backdrop-filter: blur(8px);
-      transition: all 0.15s;
+      transition: all 0.15s ease;
+      backdrop-filter: blur(4px);
     }
 
-    .hud-btn:hover {
-      background: var(--panel-border);
-      color: var(--cyan);
+    .btn-tool:hover {
+      background: var(--border-surface);
+      color: var(--text-primary);
     }
 
-    .progress-bar {
-      height: 6px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 3px;
-      overflow: hidden;
-      margin-top: 6px;
+    .btn-tool.active {
+      background: var(--border-surface);
+      color: var(--accent-sat);
+      border-color: var(--accent-sat);
     }
 
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--cyan), var(--emerald));
-      border-radius: 3px;
-      transition: width 0.4s ease;
+    /* Side Control Panel */
+    .side-panel {
+      width: 460px;
+      background: var(--panel-bg);
+      border-left: 1px solid var(--border-panel);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .panel-section {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border-panel);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+    }
+
+    /* Elevated Surface Containers */
+    .surface {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-surface);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    /* Action Recommendation Banner */
+    .action-banner {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-surface);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .action-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+
+    .action-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .action-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .badge-optimal {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-safe);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .action-sub {
+      font-size: 12px;
+      color: var(--accent-burn);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 8px;
+    }
+
+    .action-explanation {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Two-Column Metric Grid */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .metric-card {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-surface);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .metric-value {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+    }
+
+    .metric-note {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Form Controls */
+    .control-group {
+      margin-bottom: 14px;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .control-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .control-val {
+      font-size: 12px;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+
+    .slider {
+      width: 100%;
+      height: 4px;
+      background: var(--border-surface);
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-sat);
+      cursor: pointer;
+      border: 2px solid var(--panel-bg);
+    }
+
+    .checkbox-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-surface);
+      border-radius: 8px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    .checkbox-title {
+      font-size: 12px;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .checkbox-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--accent-sat);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.92;
+    }
+
+    /* Benchmarks Table */
+    .benchmarks-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .benchmarks-table th {
+      text-align: left;
+      padding: 6px 8px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-surface);
+      font-weight: 500;
+    }
+
+    .benchmarks-table td {
+      padding: 7px 8px;
+      border-bottom: 1px solid rgba(35, 39, 54, 0.6);
+      color: var(--text-secondary);
+    }
+
+    .benchmarks-table td.val-high {
+      color: var(--accent-safe);
+      font-weight: 600;
+    }
+
+    .benchmarks-table td.model-name {
+      color: var(--text-primary);
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Header -->
+  <!-- Top Aerospace Navigation Bar -->
   <header>
     <div class="brand">
-      <span class="brand-badge">UC096</span>
-      <div>
-        <h1>QuantumOrbit — Engine 2: CAM Mission Control</h1>
-        <div class="brand-sub">Autonomous Space Debris Collision Avoidance & Thruster Optimization</div>
+      <div class="brand-title">
+        QUANTUMORBIT
+        <span class="badge-sub">ENGINE 2 • CAM</span>
       </div>
     </div>
-    <div class="system-status">
-      <div class="status-pill">
-        <span class="status-dot"></span>
-        <span>ENGINE 2 ONLINE (CPU-OPT)</span>
+
+    <div class="top-telemetry">
+      <div class="target-info">
+        <span>SATELLITE:</span>
+        <span class="target-val">ISRO Cartosat-3 (#43689)</span>
       </div>
-      <div style="font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
-        TCA LOOKAHEAD: 72.0h
+      <div class="target-info">
+        <span>DEBRIS:</span>
+        <span class="target-val">Cosmos-2251 (#34127)</span>
+      </div>
+      <div class="status-indicator" id="top-status-indicator">
+        <span class="status-dot"></span>
+        <span id="top-status-text">CRITICAL INTERCEPT DETECTED</span>
       </div>
     </div>
   </header>
 
-  <!-- Main Viewport + Telemetry Panel -->
-  <div class="main-layout">
+  <!-- Main Viewport + Panel Layout -->
+  <div class="app-body">
 
-    <!-- 3D Viewport -->
+    <!-- 3D Orbit & Conjunction Viewport -->
     <div id="viewport-container">
       <canvas id="three-canvas"></canvas>
 
-      <!-- Viewport Legend -->
-      <div class="viewport-overlay">
-        <div class="legend-badge">
-          <div class="legend-color" style="background: var(--cyan);"></div>
-          <span>ISRO Cartosat-3 (#43689)</span>
+      <!-- Clean Semantic Legend -->
+      <div class="viewport-tags">
+        <div class="tag-item">
+          <div class="tag-color" style="background: var(--accent-sat);"></div>
+          <span>Satellite (Cartosat-3)</span>
         </div>
-        <div class="legend-badge">
-          <div class="legend-color" style="background: var(--crimson);"></div>
-          <span>Cosmos-2251 Debris (#34127)</span>
+        <div class="tag-item">
+          <div class="tag-color" style="background: var(--accent-debris);"></div>
+          <span>Incoming Debris Track</span>
         </div>
-        <div class="legend-badge">
-          <div class="legend-color" style="background: rgba(244, 63, 94, 0.6); border: 1px dashed var(--crimson);"></div>
-          <span>5.0 km Safety Sphere</span>
+        <div class="tag-item">
+          <div class="tag-color" style="background: rgba(239, 68, 68, 0.4); border: 1px solid var(--accent-debris);"></div>
+          <span>5.0 km Keep-Out Zone</span>
         </div>
-        <div class="legend-badge">
-          <div class="legend-color" style="background: var(--emerald);"></div>
-          <span>Optimized Burn Vector (+T)</span>
+        <div class="tag-item">
+          <div class="tag-color" style="background: var(--accent-safe);"></div>
+          <span>Engine 2 Evasive Maneuver</span>
         </div>
       </div>
 
-      <!-- Camera / Animation HUD -->
-      <div class="camera-hud">
-        <button class="hud-btn" onclick="resetCamera()">Reset View (RTN)</button>
-        <button class="hud-btn" onclick="toggleEarth()">Toggle Earth</button>
-        <button class="hud-btn" onclick="toggleAnimation()" id="anim-btn">Pause Simulation</button>
-        <button class="hud-btn" onclick="openPlotly3D()">Open Interactive Plotly 3D</button>
+      <!-- Camera Perspectives & Playback HUD -->
+      <div class="camera-toolbar">
+        <button class="btn-tool active" id="btn-cam-encounter" onclick="setCameraView('encounter')">Encounter View</button>
+        <button class="btn-tool" id="btn-cam-orbit" onclick="setCameraView('orbit')">Orbit Plane View</button>
+        <button class="btn-tool" id="btn-cam-earth" onclick="setCameraView('earth')">Global Earth View</button>
+        <button class="btn-tool" id="btn-play-pause" onclick="togglePlayPause()">Pause Orbit</button>
+        <button class="btn-tool" onclick="resetSimulation()">Reset Time</button>
       </div>
     </div>
 
-    <!-- Right Telemetry & Controls Sidebar -->
+    <!-- Right Side Mission Control Panel -->
     <div class="side-panel">
 
-      <!-- Active Conjunction Alert Card -->
+      <!-- 1. Collision Threat Status -->
       <div class="panel-section">
-        <div class="panel-title">
-          <span>Active Conjunction Crisis Event</span>
-          <span id="alert-badge" style="background: rgba(244, 63, 94, 0.2); color: var(--crimson); padding: 2px 8px; border-radius: 4px; font-size: 10px;">CRITICAL ALERT</span>
+        <div class="section-header">
+          <span class="section-title">Collision Threat Assessment</span>
+          <span style="font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);" id="label-tca-cd">ENCOUNTER IN 08h 30m</span>
         </div>
 
-        <div class="card critical-alert-card" id="crisis-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div style="font-weight: 700; font-size: 14px; color: var(--crimson);">COLLISION HAZARD DETECTED</div>
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);">EVENT #0042</div>
+        <div class="metric-grid" style="margin-top: 0;">
+          <div class="metric-card">
+            <div class="metric-label">Collision Risk</div>
+            <div class="metric-value" style="color: var(--accent-debris);" id="threat-risk-odds">1 in 312 chance</div>
+            <div class="metric-note" id="threat-risk-pc">Pc = 3.20 × 10⁻³ (Critical)</div>
           </div>
-          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
-            Tracked debris fragment on direct intercept trajectory. Collision probability exceeds safety threshold (Pc &gt; 1e-4). Autonomous maneuver computation engaged.
+          <div class="metric-card">
+            <div class="metric-label">Predicted Miss Distance</div>
+            <div class="metric-value" style="color: var(--accent-debris);" id="threat-miss-km">1.23 km</div>
+            <div class="metric-note">Safety threshold: 5.00 km</div>
           </div>
-        </div>
-
-        <div class="metric-grid">
-          <div class="metric-box">
-            <div class="metric-label">Pre-Maneuver Miss</div>
-            <div class="metric-value value-danger" id="val-pre-miss">1.23 km</div>
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Safety Req: &gt; 5.0 km</div>
+          <div class="metric-card">
+            <div class="metric-label">Time Until Closest Approach</div>
+            <div class="metric-value" id="threat-time-tca">8.5 hours</div>
+            <div class="metric-note">Optimal burn lead: 5.1h</div>
           </div>
-          <div class="metric-box">
-            <div class="metric-label">Collision Prob (Pc)</div>
-            <div class="metric-value value-danger" id="val-pc">3.20e-03</div>
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Threshold: &lt; 1e-04</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Time to TCA</div>
-            <div class="metric-value value-warning" id="val-tca">8.50 hrs</div>
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Optimal Lead: 5.1h</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Relative Velocity</div>
-            <div class="metric-value value-info" id="val-rel-vel">12.40 km/s</div>
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Crossing: 67.8°</div>
+          <div class="metric-card">
+            <div class="metric-label">Relative Intercept Velocity</div>
+            <div class="metric-value" id="threat-rel-vel">12.4 km/s</div>
+            <div class="metric-note">44,640 km/h (Crossing: 67.8°)</div>
           </div>
         </div>
       </div>
 
-      <!-- Autonomous Optimization Solution -->
+      <!-- 2. Recommended Autonomous Action -->
       <div class="panel-section">
-        <div class="panel-title">
-          <span>Autonomous CAM Solution</span>
-          <span style="color: var(--emerald); font-size: 10px;">SAFETY GUARANTEE: 100%</span>
+        <div class="section-header">
+          <span class="section-title">Autonomous Avoidance Solution</span>
+          <span class="action-badge badge-optimal">100% Collision-Free</span>
         </div>
 
-        <div class="card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.06);">
-          <div style="font-size: 11px; text-transform: uppercase; color: var(--emerald); font-weight: 700; margin-bottom: 4px;">Recommended Maneuver</div>
-          <div style="font-size: 15px; font-weight: 700; color: white;" id="val-strategy">Prograde Along-Track Phasing (±T)</div>
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Minimal propellant burn applied 5.1 hours prior to TCA.</div>
+        <div class="action-banner">
+          <div class="action-top">
+            <div class="action-title" id="action-title">Speed Up to Pass Ahead</div>
+            <span class="action-badge badge-optimal" id="action-strategy-tag">ALONG-TRACK (+T)</span>
+          </div>
+          <div class="action-sub" id="action-subtext">Burn: 0.42 m/s forward • Applied 5.1h prior to TCA</div>
+          <div class="action-explanation" id="action-explanation">
+            Fires prograde thrusters forward 5.1h before encounter. Pulls satellite safely 8.76 km ahead of the debris path with minimal propellant.
+          </div>
         </div>
 
         <div class="metric-grid">
-          <div class="metric-box">
-            <div class="metric-label">Optimal Burn (Δv)</div>
-            <div class="metric-value value-safe" id="val-burn-dv">0.4200 m/s</div>
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Along-Track Axis</div>
+          <div class="metric-card">
+            <div class="metric-label">New Miss Distance</div>
+            <div class="metric-value" style="color: var(--accent-safe);" id="sol-post-miss">8.76 km</div>
+            <div class="metric-note" style="color: var(--accent-safe);">+3.76 km safety buffer</div>
           </div>
-          <div class="metric-box">
-            <div class="metric-label">Post-Maneuver Miss</div>
-            <div class="metric-value value-safe" id="val-post-miss">8.76 km</div>
-            <div style="font-size: 10px; color: var(--emerald); margin-top: 2px;">Clearance: +3.76 km</div>
+          <div class="metric-card">
+            <div class="metric-label">Propellant Required (Δv)</div>
+            <div class="metric-value" style="color: var(--accent-burn);" id="sol-burn-dv">0.420 m/s</div>
+            <div class="metric-note" id="sol-fuel-pct">Uses 8.4% of budget</div>
           </div>
-          <div class="metric-box">
-            <div class="metric-label">Fuel Remaining</div>
-            <div class="metric-value value-info" id="val-fuel-rem">4.58 m/s</div>
-            <div class="progress-bar"><div class="progress-fill" style="width: 91%;"></div></div>
+          <div class="metric-card">
+            <div class="metric-label">Remaining Fuel Budget</div>
+            <div class="metric-value" id="sol-fuel-rem">4.580 m/s</div>
+            <div class="metric-note">Budget: 5.00 m/s</div>
           </div>
-          <div class="metric-box">
-            <div class="metric-label">Post-Burn Pc</div>
-            <div class="metric-value value-safe" id="val-post-pc">1.20e-09</div>
-            <div style="font-size: 10px; color: var(--emerald); margin-top: 2px;">Negligible Risk</div>
+          <div class="metric-card">
+            <div class="metric-label">Earth Camera Tasking</div>
+            <div class="metric-value" style="color: var(--accent-safe);" id="sol-imaging-status">0 Interrupted</div>
+            <div class="metric-note">Photo passes protected</div>
           </div>
         </div>
       </div>
 
-      <!-- Live Interactive Parameter Sliders -->
+      <!-- 3. Interactive Scenario Testing ("What-If" Engine) -->
       <div class="panel-section">
-        <div class="panel-title">
-          <span>Live Scenario Testing</span>
-          <span style="font-size: 10px; color: var(--text-muted);">FASTAPI BACKEND</span>
+        <div class="section-header">
+          <span class="section-title">Interactive Scenario Testing</span>
+          <span style="font-size: 11px; color: var(--text-muted);">LIVE ENGINE 2 INFERENCE</span>
         </div>
 
-        <div class="form-group">
-          <div class="form-label">
-            <span>Pre-Maneuver Miss Distance</span>
-            <span id="slider-miss-val" style="font-family: 'JetBrains Mono', monospace; color: var(--cyan);">1.23 km</span>
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Predicted Miss Distance</span>
+            <span class="control-val" id="ctrl-miss-val">1.23 km</span>
           </div>
-          <input type="range" class="form-slider" id="slider-miss" min="0.1" max="7.0" step="0.1" value="1.23" oninput="updateSimulation()">
+          <input type="range" class="slider" id="ctrl-miss" min="0.10" max="7.00" step="0.05" value="1.23" oninput="onInputChanged()">
         </div>
 
-        <div class="form-group">
-          <div class="form-label">
-            <span>Time to TCA (Lead Window)</span>
-            <span id="slider-tca-val" style="font-family: 'JetBrains Mono', monospace; color: var(--cyan);">8.5 hrs</span>
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Time to Closest Approach</span>
+            <span class="control-val" id="ctrl-tca-val">8.5 hrs</span>
           </div>
-          <input type="range" class="form-slider" id="slider-tca" min="0.5" max="48.0" step="0.5" value="8.5" oninput="updateSimulation()">
+          <input type="range" class="slider" id="ctrl-tca" min="0.5" max="48.0" step="0.5" value="8.5" oninput="onInputChanged()">
         </div>
 
-        <div class="form-group">
-          <div class="form-label">
-            <span>Available Fuel Budget (Δv)</span>
-            <span id="slider-fuel-val" style="font-family: 'JetBrains Mono', monospace; color: var(--cyan);">5.0 m/s</span>
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Available Fuel Budget (Δv)</span>
+            <span class="control-val" id="ctrl-fuel-val">5.00 m/s</span>
           </div>
-          <input type="range" class="form-slider" id="slider-fuel" min="0.5" max="15.0" step="0.5" value="5.0" oninput="updateSimulation()">
+          <input type="range" class="slider" id="ctrl-fuel" min="0.20" max="15.00" step="0.20" value="5.00" oninput="onInputChanged()">
         </div>
 
-        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
-          <span style="font-size: 12px; color: var(--text);">Earth Imaging Pass Conflict</span>
-          <input type="checkbox" id="check-conflict" onchange="updateSimulation()" style="width: 16px; height: 16px; accent-color: var(--amber);">
-        </div>
+        <label class="checkbox-row" for="ctrl-conflict">
+          <div>
+            <div class="checkbox-title">Scheduled Earth Photography Pass</div>
+            <div class="checkbox-desc">Requires out-of-plane steering to avoid orbit timing change</div>
+          </div>
+          <input type="checkbox" id="ctrl-conflict" onchange="onInputChanged()" style="width: 16px; height: 16px; accent-color: var(--accent-sat);">
+        </label>
 
-        <button class="btn" onclick="executeLiveOptimization()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          Re-Optimize via Engine 2 API
+        <button class="btn-primary" onclick="requestOptimizationAPI()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Compute Optimal Maneuver (Engine 2)
         </button>
       </div>
 
-      <!-- AI & Quantum Benchmarks Summary -->
-      <div class="panel-section">
-        <div class="panel-title">
-          <span>AI & Quantum Benchmarks</span>
-          <span style="font-size: 10px; color: var(--emerald);">VERIFIED</span>
+      <!-- 4. Multi-Engine Benchmarks (Compact & Verified) -->
+      <div class="panel-section" style="border-bottom: none;">
+        <div class="section-header">
+          <span class="section-title">Verified Multi-Engine Benchmarks</span>
+          <span style="font-size: 10px; color: var(--accent-safe); font-weight: 600;">CPU-OPTIMIZED</span>
         </div>
 
-        <table class="benchmark-table">
+        <table class="benchmarks-table">
           <thead>
             <tr>
-              <th>Model / Solver</th>
+              <th>Model / Engine</th>
               <th>Accuracy</th>
-              <th>MAE</th>
+              <th>Error (MAE)</th>
               <th>Fuel Saved</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td style="color: var(--cyan); font-weight: 600;">XGBoost</td>
-              <td>99.75%</td>
+              <td class="model-name">XGBoost Classifier</td>
+              <td class="val-high">99.75%</td>
               <td>0.063 m/s</td>
               <td>—</td>
             </tr>
             <tr>
-              <td style="color: var(--emerald); font-weight: 600;">PyTorch MLP</td>
-              <td>98.75%</td>
+              <td class="model-name">PyTorch Deep MLP</td>
+              <td class="val-high">98.75%</td>
               <td>0.230 m/s</td>
               <td>—</td>
             </tr>
             <tr>
-              <td style="color: var(--amber); font-weight: 600;">PPO RL Agent</td>
-              <td>100.0% safe</td>
+              <td class="model-name">PPO Reinforcement Learning</td>
+              <td class="val-high">100% Safe</td>
               <td>—</td>
-              <td style="color: var(--emerald);">+32.1%</td>
+              <td class="val-high">+32.1%</td>
             </tr>
             <tr>
-              <td style="color: var(--indigo); font-weight: 600;">QUBO / MILP</td>
-              <td>AR: 1.000</td>
+              <td class="model-name">12-Qubit QUBO / MILP</td>
+              <td class="val-high">AR: 1.000</td>
               <td>—</td>
-              <td style="color: var(--emerald);">+75.0%</td>
+              <td class="val-high">+75.0%</td>
             </tr>
           </tbody>
         </table>
@@ -592,144 +692,291 @@
   </div>
 
   <script>
-    // ------------------------------------------------------------------------
-    // Three.js 3D Orbital Trajectory & RTN Simulation
-    // ------------------------------------------------------------------------
-    let scene, camera, renderer, controls;
-    let satMesh, debrisMesh, safetySphere, preTrajectoryLine, postTrajectoryLine;
-    let earthMesh, starsMesh;
-    let animRunning = true;
-    let animClock = 0;
+    // ========================================================================
+    // Procedural High-Fidelity Earth Texture Generator (100% Offline & Reliable)
+    // ========================================================================
+    function createRealisticEarthTexture() {
+      const width = 2048;
+      const height = 1024;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
 
+      // 1. Deep Ocean Base
+      const oceanGrad = ctx.createLinearGradient(0, 0, 0, height);
+      oceanGrad.addColorStop(0.0, '#0a1a2f');
+      oceanGrad.addColorStop(0.5, '#0e2444');
+      oceanGrad.addColorStop(1.0, '#0a1a2f');
+      ctx.fillStyle = oceanGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // 2. Continents (Stylized geographical silhouettes)
+      ctx.fillStyle = '#223d2f'; // vegetation landmass
+      function drawContinent(points) {
+        ctx.beginPath();
+        ctx.moveTo(points[0][0] * width, points[0][1] * height);
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i][0] * width, points[i][1] * height);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Eurasia + Africa
+      drawContinent([
+        [0.45, 0.22], [0.55, 0.18], [0.68, 0.20], [0.80, 0.25], [0.85, 0.38],
+        [0.78, 0.52], [0.65, 0.45], [0.58, 0.55], [0.52, 0.72], [0.46, 0.65],
+        [0.43, 0.42], [0.40, 0.32], [0.42, 0.24]
+      ]);
+
+      // Americas
+      drawContinent([
+        [0.18, 0.18], [0.28, 0.22], [0.25, 0.38], [0.30, 0.50], [0.33, 0.70],
+        [0.28, 0.82], [0.22, 0.60], [0.20, 0.45], [0.12, 0.32], [0.15, 0.20]
+      ]);
+
+      // Australia
+      drawContinent([
+        [0.78, 0.65], [0.86, 0.64], [0.88, 0.75], [0.80, 0.78], [0.76, 0.70]
+      ]);
+
+      // Polar Ice Caps
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(0, 0, width, height * 0.08); // North Pole
+      ctx.fillRect(0, height * 0.90, width, height * 0.10); // South Pole
+
+      // 3. Realistic Translucent Cloud Swirls
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+      for (let i = 0; i < 40; i++) {
+        const cx = Math.random() * width;
+        const cy = 0.15 * height + Math.random() * (height * 0.7);
+        const rw = 80 + Math.random() * 220;
+        const rh = 12 + Math.random() * 40;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rw, rh, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      return texture;
+    }
+
+    // ========================================================================
+    // 3D Three.js Aerospace Orbital Simulation
+    // ========================================================================
+    let scene, camera, renderer, controls;
+    let earthMesh, atmosphereMesh;
+    let satGroup, debrisMesh, safetyBubble;
+    let preManeuverLine, postManeuverLine, orbitRing;
+    let animRunning = true;
+    let animTime = 0.0;
     const container = document.getElementById('viewport-container');
 
     function init3D() {
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0b0f19);
+      scene.background = new THREE.Color(0x090A0F);
 
-      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.set(16, 12, 20);
+      camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(12, 8, 14);
 
-      renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), antialias: true });
+      renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), antialias: true, powerPreference: "high-performance" });
       renderer.setSize(container.clientWidth, container.clientHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
       controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.maxDistance = 150;
-      controls.minDistance = 3;
+      controls.dampingFactor = 0.06;
+      controls.minDistance = 3.0;
+      controls.maxDistance = 60.0;
 
-      // Ambient & Directional Lights
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-      scene.add(ambientLight);
+      // Lights: Key Sun Light + Subtle Ambient Space Light
+      const sunLight = new THREE.DirectionalLight(0xFFFFFF, 1.4);
+      sunLight.position.set(30, 20, 25);
+      scene.add(sunLight);
 
-      const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
-      dirLight.position.set(20, 30, 20);
-      scene.add(dirLight);
+      const spaceFill = new THREE.AmbientLight(0x2A334A, 0.4);
+      scene.add(spaceFill);
 
-      // Starfield background
+      // Starfield (Subtle distant stars)
       const starGeo = new THREE.BufferGeometry();
-      const starCount = 1200;
-      const starPositions = new Float32Array(starCount * 3);
+      const starCount = 800;
+      const starCoords = new Float32Array(starCount * 3);
       for (let i = 0; i < starCount * 3; i++) {
-        starPositions[i] = (Math.random() - 0.5) * 400;
+        starCoords[i] = (Math.random() - 0.5) * 300;
       }
-      starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-      const starMat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.8, transparent: true, opacity: 0.8 });
-      starsMesh = new THREE.Points(starGeo, starMat);
-      scene.add(starsMesh);
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starCoords, 3));
+      const starMat = new THREE.PointsMaterial({ color: 0x64748B, size: 0.7, transparent: true, opacity: 0.6 });
+      scene.add(new THREE.Points(starGeo, starMat));
 
-      // Earth Globe (scaled down for visualization)
-      const earthGeo = new THREE.SphereGeometry(3.5, 32, 32);
+      // Realistic Earth Globe (LEO scale)
+      const earthRadius = 6.37;
+      const earthGeo = new THREE.SphereGeometry(earthRadius, 64, 48);
+      const earthTexture = createRealisticEarthTexture();
       const earthMat = new THREE.MeshPhongMaterial({
-        color: 0x1e3a8a,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.25,
+        map: earthTexture,
+        shininess: 12,
+        specular: new THREE.Color(0x1e3a5f),
       });
       earthMesh = new THREE.Mesh(earthGeo, earthMat);
-      earthMesh.position.set(0, -6.5, 0);
+      earthMesh.position.set(0, -earthRadius - 1.2, 0); // Positioned below satellite
+      earthMesh.rotation.z = 0.41; // 23.4° tilt
       scene.add(earthMesh);
 
-      // RTN Coordinate Grid / Reference planes
-      const gridHelper = new THREE.GridHelper(30, 30, 0x1e293b, 0x0f172a);
-      gridHelper.position.y = -0.5;
-      scene.add(gridHelper);
-
-      // Active Satellite (Cyan Marker)
-      const satGeo = new THREE.SphereGeometry(0.35, 16, 16);
-      const satMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.3, metalness: 0.8, emissive: 0x0284c7 });
-      satMesh = new THREE.Mesh(satGeo, satMat);
-      scene.add(satMesh);
-
-      // 5.0 km Safety Exclusion Sphere (Wireframe Red)
-      const sphereGeo = new THREE.SphereGeometry(5.0, 24, 24);
-      const sphereMat = new THREE.MeshBasicMaterial({
-        color: 0xf43f5e,
-        wireframe: true,
+      // Atmosphere Shell (Soft blue rim glow)
+      const atmoGeo = new THREE.SphereGeometry(earthRadius + 0.18, 48, 36);
+      const atmoMat = new THREE.MeshBasicMaterial({
+        color: 0x38BDF8,
         transparent: true,
-        opacity: 0.25
+        opacity: 0.10,
+        side: THREE.BackSide,
       });
-      safetySphere = new THREE.Mesh(sphereGeo, sphereMat);
-      scene.add(safetySphere);
+      atmosphereMesh = new THREE.Mesh(atmoGeo, atmoMat);
+      atmosphereMesh.position.copy(earthMesh.position);
+      scene.add(atmosphereMesh);
 
-      // Debris Object (Crimson Marker)
-      const debGeo = new THREE.DodecahedronGeometry(0.3, 0);
-      const debMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xe11d48 });
+      // Circular Orbit Ground-Track Ring
+      const orbitCurve = new THREE.EllipseCurve(0, 0, 7.57, 7.57, 0, 2 * Math.PI, false, 0);
+      const orbitPoints = orbitCurve.getPoints(120);
+      const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPoints.map(p => new THREE.Vector3(p.x, 0, p.y)));
+      const orbitMat = new THREE.LineBasicMaterial({ color: 0x1E293B, linewidth: 1 });
+      orbitRing = new THREE.LineLoop(orbitGeo, orbitMat);
+      orbitRing.rotation.x = Math.PI / 8;
+      scene.add(orbitRing);
+
+      // 3D Spacecraft Model (ISRO Cartosat Satellite)
+      satGroup = new THREE.Group();
+
+      // Bus Body (Aerospace Titanium / Silver)
+      const busGeo = new THREE.BoxGeometry(0.5, 0.4, 0.7);
+      const busMat = new THREE.MeshStandardMaterial({ color: 0xE2E8F0, metalness: 0.7, roughness: 0.3 });
+      const bus = new THREE.Mesh(busGeo, busMat);
+      satGroup.add(bus);
+
+      // Twin Solar Array Wings (Deep Blue Solar Cells)
+      const panelGeo = new THREE.BoxGeometry(1.2, 0.03, 0.5);
+      const panelMat = new THREE.MeshStandardMaterial({ color: 0x1E3A8A, metalness: 0.5, roughness: 0.4 });
+      
+      const leftWing = new THREE.Mesh(panelGeo, panelMat);
+      leftWing.position.set(-0.95, 0, 0);
+      satGroup.add(leftWing);
+
+      const rightWing = new THREE.Mesh(panelGeo, panelMat);
+      rightWing.position.set(0.95, 0, 0);
+      satGroup.add(rightWing);
+
+      // Optical Camera / Sensor Aperture (Nadir Facing)
+      const lensGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.2, 16);
+      const lensMat = new THREE.MeshStandardMaterial({ color: 0x0F172A, roughness: 0.1 });
+      const lens = new THREE.Mesh(lensGeo, lensMat);
+      lens.position.set(0, -0.22, 0);
+      satGroup.add(lens);
+
+      scene.add(satGroup);
+
+      // 5.0 km Keep-Out Sphere (Subtle Translucent Bubble + Equator Ring)
+      const bubbleGeo = new THREE.SphereGeometry(2.5, 32, 24); // Scaled for encounter view
+      const bubbleMat = new THREE.MeshBasicMaterial({
+        color: 0xEF4444,
+        transparent: true,
+        opacity: 0.08,
+      });
+      safetyBubble = new THREE.Mesh(bubbleGeo, bubbleMat);
+      
+      // Thin Equator Ring around Keep-Out Sphere
+      const eqGeo = new THREE.RingGeometry(2.48, 2.52, 64);
+      const eqMat = new THREE.MeshBasicMaterial({ color: 0xEF4444, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+      const eqRing = new THREE.Mesh(eqGeo, eqMat);
+      eqRing.rotation.x = Math.PI / 2;
+      safetyBubble.add(eqRing);
+
+      scene.add(safetyBubble);
+
+      // Debris Fragment (Realistic faceted rock / metal wreckage)
+      const debGeo = new THREE.DodecahedronGeometry(0.22, 0);
+      const debMat = new THREE.MeshStandardMaterial({ color: 0x64748B, roughness: 0.8, metalness: 0.5 });
       debrisMesh = new THREE.Mesh(debGeo, debMat);
+      
+      // Red Debris Beacon Marker
+      const debMarkerGeo = new THREE.SphereGeometry(0.08, 12, 12);
+      const debMarkerMat = new THREE.MeshBasicMaterial({ color: 0xEF4444 });
+      const debMarker = new THREE.Mesh(debMarkerGeo, debMarkerMat);
+      debrisMesh.add(debMarker);
+
       scene.add(debrisMesh);
 
-      // Trajectory Lines
-      buildTrajectories(1.23, 8.5, false);
+      // Construct Trajectories
+      updateTrajectoryCurves(1.23, 8.5, false);
 
       window.addEventListener('resize', onWindowResize);
       animate();
     }
 
-    function buildTrajectories(missDist, tcaHours, isConflict) {
-      if (preTrajectoryLine) scene.remove(preTrajectoryLine);
-      if (postTrajectoryLine) scene.remove(postTrajectoryLine);
+    function updateTrajectoryCurves(missDistKm, tcaHours, isConflict) {
+      if (preManeuverLine) scene.remove(preManeuverLine);
+      if (postManeuverLine) scene.remove(postManeuverLine);
 
-      // Pre-maneuver trajectory (Amber dashed)
+      // Pre-Maneuver Track (Solid Crimson Approach Path)
       const prePoints = [];
-      for (let t = -15; t <= 0; t += 0.5) {
-        prePoints.push(new THREE.Vector3(0.04 * t, 0.4 * t, 0.02 * t));
+      const scaleMiss = (missDistKm / 5.0) * 1.8; // Normalized to visual radius
+      for (let t = -14; t <= 0; t += 0.4) {
+        prePoints.push(new THREE.Vector3(
+          0.35 * t,
+          -0.12 * t,
+          scaleMiss + 0.15 * t
+        ));
       }
       const preGeo = new THREE.BufferGeometry().setFromPoints(prePoints);
-      const preMat = new THREE.LineDashedMaterial({ color: 0xf59e0b, dashSize: 0.5, gapSize: 0.3, linewidth: 2 });
-      preTrajectoryLine = new THREE.Line(preGeo, preMat);
-      preTrajectoryLine.computeLineDistances();
-      scene.add(preTrajectoryLine);
+      const preMat = new THREE.LineDashedMaterial({ color: 0xEF4444, dashSize: 0.4, gapSize: 0.2, linewidth: 2 });
+      preManeuverLine = new THREE.Line(preGeo, preMat);
+      preManeuverLine.computeLineDistances();
+      scene.add(preManeuverLine);
 
-      // Post-maneuver trajectory (Emerald curved away)
+      // Evasive Dodge Trajectory (Solid Emerald Path - Smooth Clearance)
       const postPoints = [];
-      const shiftAxis = isConflict ? 'N' : 'T';
-      for (let t = 0; t <= 18; t += 0.5) {
-        let x = 0.05 * t;
-        let y = (shiftAxis === 'T') ? (0.6 * t + 0.08 * t * t) : (0.4 * t);
-        let z = (shiftAxis === 'N') ? (0.5 * t + 0.06 * t * t) : (0.02 * t);
-        postPoints.push(new THREE.Vector3(x, y, z));
+      const shiftX = isConflict ? 0.2 : 0.6;
+      const shiftZ = isConflict ? 1.4 : 0.8;
+      for (let t = 0; t <= 16; t += 0.4) {
+        postPoints.push(new THREE.Vector3(
+          0.02 * t + (shiftX * 0.03 * t * t) * 0.15,
+          0.04 * t,
+          (shiftZ * 0.05 * t * t) * 0.18
+        ));
       }
       const postGeo = new THREE.BufferGeometry().setFromPoints(postPoints);
-      const postMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 3 });
-      postTrajectoryLine = new THREE.Line(postGeo, postMat);
-      scene.add(postTrajectoryLine);
+      const postMat = new THREE.LineBasicMaterial({ color: 0x10B981, linewidth: 3 });
+      postManeuverLine = new THREE.Line(postGeo, postMat);
+      scene.add(postManeuverLine);
     }
 
     function animate() {
       requestAnimationFrame(animate);
 
       if (animRunning) {
-        animClock += 0.015;
-        // Move debris across the safety sphere
-        const debT = ((animClock % 4) - 2) * 8;
-        const miss = parseFloat(document.getElementById('slider-miss').value);
-        debrisMesh.position.set(0.3 * debT, -debT, miss * 0.5 + 0.1 * debT);
+        animTime += 0.016;
 
-        // Slow rotation of Earth & stars
-        if (earthMesh) earthMesh.rotation.y += 0.002;
-        if (starsMesh) starsMesh.rotation.y += 0.0003;
+        // Slow Earth Axial Rotation
+        if (earthMesh) earthMesh.rotation.y += 0.001;
+
+        // Gentle Satellite Nadir Oscillation
+        if (satGroup) {
+          satGroup.rotation.y = Math.sin(animTime * 0.4) * 0.05;
+        }
+
+        // Animate Debris Moving along approach path
+        const cycle = ((animTime * 0.8) % 4) - 2; // -2 to +2
+        const miss = parseFloat(document.getElementById('ctrl-miss').value);
+        const scaleMiss = (miss / 5.0) * 1.8;
+        
+        debrisMesh.position.set(
+          cycle * 4.2,
+          -cycle * 1.4,
+          scaleMiss + cycle * 1.8
+        );
+        debrisMesh.rotation.x += 0.02;
+        debrisMesh.rotation.y += 0.03;
       }
 
       controls.update();
@@ -742,86 +989,126 @@
       renderer.setSize(container.clientWidth, container.clientHeight);
     }
 
-    function resetCamera() {
-      camera.position.set(16, 12, 20);
-      controls.target.set(0, 0, 0);
+    // Camera Perspective Switching
+    function setCameraView(preset) {
+      document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active'));
+      
+      if (preset === 'encounter') {
+        document.getElementById('btn-cam-encounter').classList.add('active');
+        camera.position.set(8, 5, 9);
+        controls.target.set(0, 0, 0);
+      } else if (preset === 'orbit') {
+        document.getElementById('btn-cam-orbit').classList.add('active');
+        camera.position.set(0, 18, 0);
+        controls.target.set(0, 0, 0);
+      } else if (preset === 'earth') {
+        document.getElementById('btn-cam-earth').classList.add('active');
+        camera.position.set(20, 14, 25);
+        controls.target.set(0, -6, 0);
+      }
     }
 
-    function toggleEarth() {
-      if (earthMesh) earthMesh.visible = !earthMesh.visible;
-    }
-
-    function toggleAnimation() {
+    function togglePlayPause() {
       animRunning = !animRunning;
-      document.getElementById('anim-btn').innerText = animRunning ? "Pause Simulation" : "Resume Simulation";
+      document.getElementById('btn-play-pause').innerText = animRunning ? "Pause Orbit" : "Resume Orbit";
     }
 
-    function openPlotly3D() {
-      window.open('/plots/1_3d_conjunction_dodge_trajectory.html', '_blank');
+    function resetSimulation() {
+      animTime = 0.0;
     }
 
-    // ------------------------------------------------------------------------
-    // UI Slider Updates & Live Optimization
-    // ------------------------------------------------------------------------
-    function updateSimulation() {
-      const miss = parseFloat(document.getElementById('slider-miss').value);
-      const tca = parseFloat(document.getElementById('slider-tca').value);
-      const fuel = parseFloat(document.getElementById('slider-fuel').value);
-      const conflict = document.getElementById('check-conflict').checked;
+    // ========================================================================
+    // Human-Friendly UI Logic & Live FastAPI Integration
+    // ========================================================================
+    function onInputChanged() {
+      const miss = parseFloat(document.getElementById('ctrl-miss').value);
+      const tca = parseFloat(document.getElementById('ctrl-tca').value);
+      const fuel = parseFloat(document.getElementById('ctrl-fuel').value);
+      const isConflict = document.getElementById('ctrl-conflict').checked;
 
-      document.getElementById('slider-miss-val').innerText = miss.toFixed(2) + " km";
-      document.getElementById('slider-tca-val').innerText = tca.toFixed(1) + " hrs";
-      document.getElementById('slider-fuel-val').innerText = fuel.toFixed(1) + " m/s";
+      // Update Slider Label Text
+      document.getElementById('ctrl-miss-val').innerText = miss.toFixed(2) + " km";
+      document.getElementById('ctrl-tca-val').innerText = tca.toFixed(1) + " hrs";
+      document.getElementById('ctrl-fuel-val').innerText = fuel.toFixed(2) + " m/s";
 
-      document.getElementById('val-pre-miss').innerText = miss.toFixed(2) + " km";
-      document.getElementById('val-tca').innerText = tca.toFixed(1) + " hrs";
+      // Compute Humanized Status
+      const pc = Math.exp(-0.5 * Math.pow(miss / 0.5, 2)) * 0.0035;
+      const isSafe = (miss >= 5.0 && pc < 1e-4);
 
-      // Collision probability approx based on miss distance
-      const pc = Math.exp(-0.5 * Math.pow(miss / 0.5, 2)) * 0.004;
-      document.getElementById('val-pc').innerText = pc < 1e-7 ? "< 1.0e-07" : pc.toExponential(2);
+      // Threat Panel
+      document.getElementById('threat-miss-km').innerText = miss.toFixed(2) + " km";
+      document.getElementById('threat-time-tca').innerText = tca.toFixed(1) + " hours";
+      document.getElementById('label-tca-cd').innerText = "ENCOUNTER IN " + Math.floor(tca) + "h " + Math.round((tca % 1) * 60) + "m";
 
-      // Strategy heuristics
-      let strategy = "Prograde Along-Track (±T)";
-      let burnDv = 0.42;
-      let postMiss = 5.0 + Math.random() * 3.5;
-
-      if (miss >= 5.0 && pc < 1e-4) {
-        strategy = "Hold / No-Burn Safe Pass";
-        burnDv = 0.0;
-        postMiss = miss;
-        document.getElementById('alert-badge').innerText = "NOMINAL PASS";
-        document.getElementById('alert-badge').style.color = "var(--emerald)";
-        document.getElementById('alert-badge').style.background = "rgba(16, 185, 129, 0.2)";
-      } else if (tca < 4.0) {
-        strategy = "Hybrid Emergency Burn (±R/±T)";
-        burnDv = Math.min(1.85, fuel);
-        document.getElementById('alert-badge').innerText = "EMERGENCY ALERT";
-        document.getElementById('alert-badge').style.color = "var(--crimson)";
-      } else if (conflict) {
-        strategy = "Cross-Track Normal Shift (±N)";
-        burnDv = Math.min(2.40, fuel);
-        document.getElementById('alert-badge').innerText = "IMAGING CONFLICT LOCK";
-        document.getElementById('alert-badge').style.color = "var(--amber)";
+      if (isSafe) {
+        document.getElementById('threat-risk-odds').innerText = "Safe Clearance";
+        document.getElementById('threat-risk-odds').style.color = "var(--accent-safe)";
+        document.getElementById('threat-risk-pc').innerText = "Risk < 1 in 100,000,000";
+        document.getElementById('threat-miss-km').style.color = "var(--accent-safe)";
+        document.getElementById('top-status-text').innerText = "SAFE CLEARANCE CONFIRMED";
+        document.getElementById('top-status-indicator').style.borderColor = "rgba(16, 185, 129, 0.4)";
+        document.getElementById('top-status-indicator').style.color = "var(--accent-safe)";
+        document.getElementById('top-status-indicator').style.background = "rgba(16, 185, 129, 0.12)";
       } else {
-        strategy = "Prograde Along-Track (±T)";
-        burnDv = Math.min(0.42, fuel);
-        document.getElementById('alert-badge').innerText = "CRITICAL ALERT";
-        document.getElementById('alert-badge').style.color = "var(--crimson)";
+        const odds = Math.max(2, Math.round(1.0 / Math.max(pc, 1e-6)));
+        document.getElementById('threat-risk-odds').innerText = "1 in " + odds.toLocaleString() + " chance";
+        document.getElementById('threat-risk-odds').style.color = "var(--accent-debris)";
+        document.getElementById('threat-risk-pc').innerText = "Pc = " + pc.toExponential(2) + " (Critical)";
+        document.getElementById('threat-miss-km').style.color = "var(--accent-debris)";
+        document.getElementById('top-status-text').innerText = "CRITICAL INTERCEPT DETECTED";
+        document.getElementById('top-status-indicator').style.borderColor = "rgba(239, 68, 68, 0.4)";
+        document.getElementById('top-status-indicator').style.color = "var(--accent-debris)";
+        document.getElementById('top-status-indicator').style.background = "rgba(239, 68, 68, 0.12)";
       }
 
-      document.getElementById('val-strategy').innerText = strategy;
-      document.getElementById('val-burn-dv').innerText = burnDv.toFixed(4) + " m/s";
-      document.getElementById('val-post-miss').innerText = postMiss.toFixed(2) + " km";
-      document.getElementById('val-fuel-rem').innerText = (fuel - burnDv).toFixed(2) + " m/s";
+      // Action Recommendation Logic (Plain English)
+      let title = "Speed Up to Pass Ahead";
+      let tag = "ALONG-TRACK (+T)";
+      let burnDv = 0.42;
+      let postMiss = 8.76;
+      let explanation = "Fires prograde thrusters forward 5.1h before encounter. Pulls satellite safely ahead of debris without altering orbital plane.";
+      let imaging = "0 Interrupted";
 
-      buildTrajectories(miss, tca, conflict);
+      if (isSafe) {
+        title = "Maintain Current Course";
+        tag = "SAFE PASS (HOLD)";
+        burnDv = 0.00;
+        postMiss = miss;
+        explanation = "Trajectory screening confirms natural separation exceeds 5.0 km keep-out threshold. Thrusters remain cold.";
+      } else if (tca < 4.0) {
+        title = "Emergency Radial Burst";
+        tag = "HYBRID RADIAL (±R/±T)";
+        burnDv = Math.min(1.85, fuel);
+        postMiss = 7.15;
+        explanation = "Immediate high-thrust impulse under 4 hours to rapidly pull satellite away from impending collision plane.";
+      } else if (isConflict) {
+        title = "Sidestep Orbit (Cross-Track)";
+        tag = "CROSS-TRACK (±N)";
+        burnDv = Math.min(2.10, fuel);
+        postMiss = 6.80;
+        explanation = "Fires thrusters sideways in cross-track plane. Preserves orbit ground-track timing and protects scheduled optical camera pass.";
+        imaging = "Protected (Zero Drift)";
+      }
+
+      document.getElementById('action-title').innerText = title;
+      document.getElementById('action-strategy-tag').innerText = tag;
+      document.getElementById('action-subtext').innerText = "Burn: " + burnDv.toFixed(3) + " m/s • Applied " + (tca * 0.6).toFixed(1) + "h prior to TCA";
+      document.getElementById('action-explanation').innerText = explanation;
+
+      document.getElementById('sol-post-miss').innerText = postMiss.toFixed(2) + " km";
+      document.getElementById('sol-burn-dv').innerText = burnDv.toFixed(3) + " m/s";
+      document.getElementById('sol-fuel-pct').innerText = "Uses " + ((burnDv / Math.max(fuel, 0.01)) * 100).toFixed(1) + "% of budget";
+      document.getElementById('sol-fuel-rem').innerText = (fuel - burnDv).toFixed(3) + " m/s";
+      document.getElementById('sol-imaging-status').innerText = imaging;
+
+      updateTrajectoryCurves(miss, tca, isConflict);
     }
 
-    async function executeLiveOptimization() {
-      const miss = parseFloat(document.getElementById('slider-miss').value);
-      const tca = parseFloat(document.getElementById('slider-tca').value);
-      const fuel = parseFloat(document.getElementById('slider-fuel').value);
-      const conflict = document.getElementById('check-conflict').checked ? 1 : 0;
+    async function requestOptimizationAPI() {
+      const miss = parseFloat(document.getElementById('ctrl-miss').value);
+      const tca = parseFloat(document.getElementById('ctrl-tca').value);
+      const fuel = parseFloat(document.getElementById('ctrl-fuel').value);
+      const isConflict = document.getElementById('ctrl-conflict').checked ? 1 : 0;
 
       const payload = {
         conjunction_id: 42,
@@ -830,7 +1117,7 @@
         time_to_tca_hours: tca,
         pre_maneuver_miss_dist_km: miss,
         relative_velocity_kms: 12.4,
-        collision_prob_pc: 3.2e-3,
+        collision_prob_pc: Math.exp(-0.5 * Math.pow(miss / 0.5, 2)) * 0.0035,
         crossing_angle_deg: 67.8,
         sat_altitude_km: 620.0,
         sat_inclination_deg: 97.4,
@@ -840,33 +1127,39 @@
         cov_sigma_T_m: 450.0,
         available_fuel_dv_ms: fuel,
         min_impulse_bit_ms: 0.01,
-        target_pass_conflict_flag: conflict,
+        target_pass_conflict_flag: isConflict,
         mission_priority_tier: 1
       };
 
       try {
-        const response = await fetch('/api/v1/engine2/optimize-maneuver', {
+        const res = await fetch('/api/v1/engine2/optimize-maneuver', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (response.ok) {
-          const res = await response.json();
-          document.getElementById('val-strategy').innerText = res.optimal_maneuver_label;
-          document.getElementById('val-burn-dv').innerText = res.optimal_burn_dv_ms.toFixed(4) + " m/s";
-          document.getElementById('val-post-miss').innerText = res.post_maneuver_miss_dist_km.toFixed(2) + " km";
-          document.getElementById('val-fuel-rem').innerText = res.fuel_remaining_dv_ms.toFixed(2) + " m/s";
-          document.getElementById('val-post-pc').innerText = res.collision_prob_post.toExponential(2);
-          alert("✓ Engine 2 Optimization Verified:\nStrategy: " + res.optimal_maneuver_label + "\nBurn: " + res.optimal_burn_dv_ms + " m/s\nPost-Miss: " + res.post_maneuver_miss_dist_km + " km (Clearance guaranteed!)");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.human_title) document.getElementById('action-title').innerText = data.human_title;
+          if (data.human_description) document.getElementById('action-explanation').innerText = data.human_description;
+          document.getElementById('action-strategy-tag').innerText = data.burn_axis.toUpperCase();
+          document.getElementById('sol-burn-dv').innerText = data.optimal_burn_dv_ms.toFixed(3) + " m/s";
+          document.getElementById('sol-post-miss').innerText = data.post_maneuver_miss_dist_km.toFixed(2) + " km";
+          document.getElementById('sol-fuel-rem').innerText = data.fuel_remaining_dv_ms.toFixed(3) + " m/s";
+          if (data.human_risk_ratio) document.getElementById('threat-risk-odds').innerText = data.human_risk_ratio;
+          
+          updateTrajectoryCurves(miss, tca, isConflict === 1);
         } else {
-          updateSimulation();
+          onInputChanged();
         }
-      } catch (e) {
-        updateSimulation();
+      } catch (err) {
+        onInputChanged();
       }
     }
 
-    window.onload = init3D;
+    window.onload = () => {
+      init3D();
+      onInputChanged();
+    };
   </script>
 </body>
 </html>

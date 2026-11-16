@@ -325,3 +325,4 @@ out_path.parent.mkdir(parents=True, exist_ok=True)
 with open(out_path, 'w', encoding='utf-8') as f:
     nbf.write(nb, f)
 print(f'Generated Colab notebook: {out_path}')
+
