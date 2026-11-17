@@ -14,7 +14,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   
-  <!-- GSAP for Smooth Google Earth Fly-To Transitions -->
+  <!-- GSAP for Smooth Spherical Fly-To Transitions -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   
   <!-- Lucide Icons -->
@@ -413,23 +413,27 @@
     .tele-value.safe    { color: var(--safe); }
     .tele-value.neutral { color: var(--text-2); }
 
-    /* Swarm Mini Queue */
+    /* Swarm Mini Queue (Permanent DOM - Zero Blinking) */
+    #swarm-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
     .swarm-item {
       display: flex; align-items: center; gap: 8px;
       padding: 7px 10px;
       border-radius: var(--r-sm);
-      margin-bottom: 4px;
       border: 1px solid var(--border);
       background: transparent;
       cursor: pointer;
-      transition: background 150ms, border-color 150ms;
+      transition: background 140ms ease, border-color 140ms ease;
+      user-select: none;
     }
     .swarm-item:hover { background: var(--surface-2); border-color: var(--border-hard); }
     .swarm-item.active-threat {
       background: var(--accent-dim);
       border-color: var(--accent-ring);
     }
-    .swarm-item:last-child { margin-bottom: 0; }
     .swarm-icon {
       width: 14px; height: 14px; flex-shrink: 0; color: var(--text-3);
     }
@@ -939,7 +943,7 @@
        TOP BAR
        ========================================================================= -->
   <header id="topbar">
-    <div class="tb-logo" onclick="focusObject('global')" title="Reset to Global View">
+    <div class="tb-logo" onclick="flyToGlobal()" title="Reset to Global View">
       <div class="tb-logo-mark">
         <i data-lucide="orbit"></i>
       </div>
@@ -950,22 +954,22 @@
 
     <!-- Quick Camera Focus Shortcuts -->
     <div class="tb-quick-focus">
-      <button class="tb-focus-btn" id="btn-focus-sat" onclick="focusObject('sat')" title="Fly to Satellite">
+      <button class="tb-focus-btn" id="btn-focus-sat" onclick="flyToObject(satGroup)" title="Fly to Satellite">
         <i data-lucide="satellite"></i>
         CARTOSAT-3
       </button>
-      <button class="tb-focus-btn" id="btn-focus-threat" onclick="focusObject('debris', activeThreatIdx)" title="Fly to Active Threat">
+      <button class="tb-focus-btn" id="btn-focus-threat" onclick="flyToObject(debrisSwarm[activeThreatIdx])" title="Fly to Active Threat">
         <i data-lucide="crosshair"></i>
         <span id="tb-threat-quick-name">THREAT</span>
       </button>
     </div>
 
     <!-- Live Threat Status Indicator -->
-    <div class="tb-threat-badge" id="tb-threat-pill" onclick="focusObject('debris', activeThreatIdx)" title="Click to track threat">
+    <div class="tb-threat-badge" id="tb-threat-pill" onclick="flyToObject(debrisSwarm[activeThreatIdx])" title="Click to track threat">
       <i data-lucide="shield-alert"></i>
       <span id="tb-threat-text">ACTIVE THREAT</span>
     </div>
-    <div class="tb-safe-pill" id="tb-safe-pill" onclick="focusObject('sat')" title="Click to track satellite">
+    <div class="tb-safe-pill" id="tb-safe-pill" onclick="flyToObject(satGroup)" title="Click to track satellite">
       <i data-lucide="shield-check"></i>
       SAFE CLEARANCE
     </div>
@@ -1025,7 +1029,7 @@
       </div>
     </div>
 
-    <!-- Active Swarm Queue -->
+    <!-- Active Swarm Queue (Zero-Blink Permanent DOM) -->
     <div class="sidebar-section">
       <div class="section-label">Multi-Debris Swarm Queue (7)</div>
       <div id="swarm-list"></div>
@@ -1127,7 +1131,7 @@
     <span class="dock-clock">MET <span id="dock-clock-val">+00:00:00</span></span>
     <span class="dock-clock" style="margin-left:14px">Orbit <span id="dock-orbit-num">1</span></span>
 
-    <div class="dock-cam" id="dock-cam" onclick="focusObject('global')">
+    <div class="dock-cam" id="dock-cam" onclick="flyToGlobal()">
       <i data-lucide="compass"></i>
       <span id="cam-label">Global View</span>
     </div>
@@ -1293,7 +1297,7 @@
 </div>
 
 <!-- =========================================================================
-     THREE.JS 3D ENGINE & PRECISION SQUARE-PIXEL SIMULATION
+     THREE.JS 3D ENGINE & PRECISION 3D-EXTRUDED EARTH SIMULATION
      ========================================================================= -->
 <script>
 /* ============================================================
@@ -1306,6 +1310,9 @@ const DEBRIS_SIZE_MIN = 0.20;
 const DEBRIS_SIZE_MAX = 0.42;
 const SAFETY_KM = 5.0;
 
+// Permanent World Center Origin: Earth is locked strictly at (0, 0, 0)
+const WORLD_CENTER = new THREE.Vector3(0, 0, 0);
+
 // Tweaks
 const tweaks = { orbits: true, beacons: true, grid: true, auto: false, milky: true };
 
@@ -1315,8 +1322,9 @@ let paused = false;
 let simMET = 0;
 let orbitCount = 1;
 
-// Camera mode: 'global' | 'sat' | 'debris-N'
+// Camera Tracking State
 let cameraMode = 'global';
+let trackedTarget = null;
 let isFlyingTo = false;
 
 // Illumination mode: 'full' (Full Lit) vs 'shade' (Day/Night)
@@ -1342,7 +1350,7 @@ renderer.setClearColor(0x040508, 1);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x040508);
 
-const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2500);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 3000);
 camera.position.set(0, 48, 150);
 
 const controls = new THREE.OrbitControls(camera, canvas);
@@ -1352,13 +1360,13 @@ controls.minDistance = 0.8;
 controls.maxDistance = 260.0;
 // Disable accidental panning so Earth is ALWAYS pinned at center
 controls.enablePan = false;
+controls.target.copy(WORLD_CENTER);
 
 /* ============================================================
-   PRE-ALLOCATED SCRATCH VECTORS (Zero Garbage Collection)
+   PRE-ALLOCATED SCRATCH VECTORS (Zero GC)
    ============================================================ */
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
-const _scratchCam = new THREE.Vector3();
 
 /* ============================================================
    LIGHTING ENGINE (DAYLIGHT / FULL LIT TOGGLE)
@@ -1367,12 +1375,12 @@ const _scratchCam = new THREE.Vector3();
 const ambientLight = new THREE.AmbientLight(0xFFFFFF, 2.2);
 scene.add(ambientLight);
 
-const sunLight = new THREE.DirectionalLight(0xFFF6E8, 0.35);
+const sunLight = new THREE.DirectionalLight(0xFFF6E8, 0.45);
 sunLight.position.set(220, 90, 110);
 sunLight.castShadow = true;
 scene.add(sunLight);
 
-const rimLight = new THREE.DirectionalLight(0x3B82F6, 0.25);
+const rimLight = new THREE.DirectionalLight(0x38BDF8, 0.35);
 rimLight.position.set(-160, 60, -90);
 scene.add(rimLight);
 
@@ -1382,14 +1390,12 @@ function setIllumination(mode) {
   const txt = document.getElementById('light-mode-text');
 
   if (mode === 'full') {
-    // 100% brightly lit from all angles
     ambientLight.intensity = 2.2;
-    sunLight.intensity = 0.35;
-    rimLight.intensity = 0.25;
+    sunLight.intensity = 0.45;
+    rimLight.intensity = 0.35;
     btn.classList.add('active');
     txt.textContent = 'Full Lit';
   } else {
-    // Directional Day/Night Shade with generous ambient fill so night is never pitch black
     ambientLight.intensity = 0.85;
     sunLight.intensity = 1.45;
     rimLight.intensity = 0.40;
@@ -1403,210 +1409,303 @@ function toggleIllumination() {
 }
 
 /* ============================================================
-   SQUARE-PIXEL STARFIELD & MILKY WAY GALAXY BAND
+   5. HIGH-VISIBILITY DEEP SPACE STARFIELD & MILKY WAY
    ============================================================ */
 let milkyWayMesh;
-(function buildSquarePixelStarfield() {
-  // Generate square particle texture
-  const sqCvs = document.createElement('canvas');
-  sqCvs.width = 4; sqCvs.height = 4;
-  const sqCtx = sqCvs.getContext('2d');
-  sqCtx.fillStyle = '#FFFFFF';
-  sqCtx.fillRect(0, 0, 4, 4);
-  const sqTex = new THREE.CanvasTexture(sqCvs);
-  sqTex.magFilter = THREE.NearestFilter;
-  sqTex.minFilter = THREE.NearestFilter;
+(function buildHighVisibilityStars() {
+  // 1. Crisp Background Stars (2,500 points): sizeAttenuation: false
+  const starGeo = new THREE.BufferGeometry();
+  const starPos = new Float32Array(2500 * 3);
+  const starCols = new Float32Array(2500 * 3);
+  const cWhite = new THREE.Color('#FFFFFF');
+  const cIce = new THREE.Color('#BAE6FD');
+  const cGold = new THREE.Color('#FDE68A');
 
-  const count = 1600;
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < 2500; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const r = 880 + Math.random() * 120;
-    positions[i*3]   = r * Math.sin(phi) * Math.cos(theta);
-    positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-    positions[i*3+2] = r * Math.cos(phi);
+    const r = 650 + Math.random() * 250;
+    starPos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+    starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    starPos[i * 3 + 2] = r * Math.cos(phi);
 
-    const b = 0.65 + Math.random() * 0.35;
     const p = Math.random();
-    if (p < 0.2) { colors[i*3]=b*0.8; colors[i*3+1]=b*0.88; colors[i*3+2]=b; }
-    else if (p < 0.4) { colors[i*3]=b; colors[i*3+1]=b*0.92; colors[i*3+2]=b*0.75; }
-    else { colors[i*3]=b; colors[i*3+1]=b; colors[i*3+2]=b; }
+    const col = p < 0.6 ? cWhite : (p < 0.85 ? cIce : cGold);
+    starCols[i * 3]     = col.r;
+    starCols[i * 3 + 1] = col.g;
+    starCols[i * 3 + 2] = col.b;
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const mat = new THREE.PointsMaterial({ size: 1.8, map: sqTex, transparent: true, vertexColors: true, sizeAttenuation: true });
-  scene.add(new THREE.Points(geo, mat));
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  starGeo.setAttribute('color', new THREE.BufferAttribute(starCols, 3));
+  const starMat = new THREE.PointsMaterial({
+    size: 2.0,
+    sizeAttenuation: false, // Guaranteed screen pixels!
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.85,
+  });
+  scene.add(new THREE.Points(starGeo, starMat));
 
-  // Subtle square-pixel Milky Way galaxy band
-  const mwCount = 500;
-  const mwPos = new Float32Array(mwCount * 3);
-  for (let i = 0; i < mwCount; i++) {
-    const a = (Math.random() - 0.5) * Math.PI * 2;
-    const spread = (Math.random() - 0.5) * 0.28;
-    const r = 850 + Math.random() * 80;
-    mwPos[i*3]   = r * Math.cos(a);
-    mwPos[i*3+1] = r * Math.sin(a) * 0.15 + spread * r;
-    mwPos[i*3+2] = r * Math.sin(a) * Math.cos(spread);
+  // 2. Bright Navigation Stars (300 points)
+  const navGeo = new THREE.BufferGeometry();
+  const navPos = new Float32Array(300 * 3);
+  for (let i = 0; i < 300; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 600 + Math.random() * 200;
+    navPos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+    navPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    navPos[i * 3 + 2] = r * Math.cos(phi);
   }
+  navGeo.setAttribute('position', new THREE.BufferAttribute(navPos, 3));
+  const navMat = new THREE.PointsMaterial({
+    size: 3.5,
+    sizeAttenuation: false,
+    color: 0xFFFFFF,
+    transparent: true,
+    opacity: 0.95,
+  });
+  scene.add(new THREE.Points(navGeo, navMat));
+
+  // 3. Inclined Milky Way Galactic Band (5,000 points tilted at 58°)
   const mwGeo = new THREE.BufferGeometry();
+  const mwPos = new Float32Array(5000 * 3);
+  const mwCols = new Float32Array(5000 * 3);
+  const cSlate = new THREE.Color('#38BDF8');
+  const cViolet = new THREE.Color('#818CF8');
+  const cDust = new THREE.Color('#E2E8F0');
+
+  for (let i = 0; i < 5000; i++) {
+    const a = (Math.random() - 0.5) * Math.PI * 2;
+    const spread = (Math.random() - 0.5) * (Math.random() - 0.5) * 0.45;
+    const r = 700 + Math.random() * 180;
+
+    const rawX = r * Math.cos(a);
+    const rawY = r * Math.sin(a) * 0.18 + spread * r;
+    const rawZ = r * Math.sin(a) * Math.cos(spread);
+
+    // Rotate by 58° around X-axis
+    const tilt = 58 * Math.PI / 180;
+    mwPos[i * 3]     = rawX;
+    mwPos[i * 3 + 1] = rawY * Math.cos(tilt) - rawZ * Math.sin(tilt);
+    mwPos[i * 3 + 2] = rawY * Math.sin(tilt) + rawZ * Math.cos(tilt);
+
+    const p = Math.random();
+    const col = p < 0.45 ? cSlate : (p < 0.75 ? cViolet : cDust);
+    mwCols[i * 3]     = col.r;
+    mwCols[i * 3 + 1] = col.g;
+    mwCols[i * 3 + 2] = col.b;
+  }
   mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPos, 3));
-  const mwMat = new THREE.PointsMaterial({ size: 2.2, map: sqTex, color: 0x93C5FD, transparent: true, opacity: 0.18, sizeAttenuation: true });
+  mwGeo.setAttribute('color', new THREE.BufferAttribute(mwCols, 3));
+  const mwMat = new THREE.PointsMaterial({
+    size: 2.8,
+    sizeAttenuation: false,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.32,
+  });
   milkyWayMesh = new THREE.Points(mwGeo, mwMat);
-  milkyWayMesh.rotation.z = 0.45;
   scene.add(milkyWayMesh);
 })();
 
 /* ============================================================
-   TRUE SQUARE-PIXEL EARTH (SMOOTH SPHERE + 360x180 NEAREST-FILTER)
+   1. TRUE 3D SMALL-TRIANGLE FACETED EARTH WITH EXTRUDED CONTINENTS
    ============================================================ */
 const earthGroup = new THREE.Group();
-// Earth MUST never move in space — pinned strictly at world origin
-earthGroup.position.set(0, 0, 0);
+earthGroup.position.copy(WORLD_CENTER);
 scene.add(earthGroup);
 
-function createSquarePixelEarthTexture() {
-  const w = 360, h = 180;
-  const cvs = document.createElement('canvas');
-  cvs.width = w; cvs.height = h;
-  const ctx = cvs.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
+function isLandBiome(lat, lon) {
+  // Antarctica
+  if (lat < -65) return { type: 'ice', color: '#F1F5F9' };
+  // Arctic sea ice & Greenland
+  if (lat >= 60 && lat <= 84 && lon >= -73 && lon <= -12) return { type: 'ice', color: '#F1F5F9' };
+  if (lat > 78) return { type: 'ice', color: '#F1F5F9' };
 
-  // Geographic classification function for 1° x 1° pixel grid
-  function getPixelCategory(lon, lat) {
-    if (lat < -62) return 'ice';
-    if (60 <= lat <= 83 && -72 <= lon <= -12) return lat > 72 ? 'ice' : 'land';
-    if (lat >= 80) return 'ice';
+  // South Atlantic & Indian Ocean cutouts
+  if (lat < 0 && lon >= -30 && lon <= 12) return null; // South Atlantic
+  if (lat < 6 && lon >= 42 && lon <= 96) return null;  // Indian Ocean south of India
+  if (lat < 12 && lon >= 80 && lon <= 95) return null; // Bay of Bengal south
 
-    // North America
-    if (10 <= lat < 72 && -168 <= lon <= -52) {
-      if (18 <= lat <= 30 && -98 <= lon <= -82) return 'ocean';
-      if (10 <= lat <= 20 && -82 <= lon <= -60) return 'shallow';
-      if (51 <= lat <= 64 && -95 <= lon <= -78) return 'ocean';
-      return 'land';
+  // Pacific Ocean cutouts
+  if (lon > 145 && lat < 55) return null;
+  if (lon < -130 && lat < 45) return null;
+
+  // India & Indian Subcontinent (Prominent peninsula at 8°N–35°N, 68°E–92°E)
+  if (lat >= 8 && lat <= 35 && lon >= 68 && lon <= 92) {
+    if (lat < 22) {
+      const minLon = 72 + (22 - lat) * 0.55;
+      const maxLon = 86 - (22 - lat) * 0.65;
+      if (lon >= minLon && lon <= maxLon) return { type: 'land', color: '#2D6A4F' };
+      return null;
     }
-
-    // South America
-    if (-56 <= lat < 12 && -82 <= lon <= -34) {
-      if (lat < -20 && lon > -45 - (lat + 20) * 0.6) return 'ocean';
-      if (lat < -10 && lon < -80 + (lat + 10) * 0.4) return 'ocean';
-      return 'land';
-    }
-
-    // Africa
-    if (-35 <= lat <= 37 && -18 <= lon <= 52) {
-      if (12 <= lat <= 28 && 33 <= lon <= 43) return 'ocean';
-      if (lat < 5 && lon > 42 + (lat - 5) * 0.4) return 'ocean';
-      if (-5 <= lat <= 5 && 5 <= lon <= 15) return 'shallow';
-      if (lat < -10 && lon < 12 - (lat + 10) * 0.3) return 'ocean';
-      if (18 <= lat <= 32 && -14 <= lon <= 35) return 'desert';
-      return 'land';
-    }
-
-    // Europe
-    if (36 <= lat <= 71 && -10 <= lon <= 40) {
-      if (32 <= lat <= 42 && -5 <= lon <= 25) return 'ocean';
-      if (54 <= lat <= 65 && 15 <= lon <= 26) return 'shallow';
-      if (41 <= lat <= 47 && 28 <= lon <= 42) return 'ocean';
-      return 'land';
-    }
-
-    // Asia & Middle East
-    if (5 <= lat <= 75 && 40 <= lon <= 180) {
-      if (12 <= lat <= 32 && 35 <= lon <= 60) return (15 <= lat <= 28 && 38 <= lon <= 55) ? 'desert' : 'land';
-      if (24 <= lat <= 30 && 48 <= lon <= 56) return 'shallow';
-      if (36 <= lat <= 47 && 47 <= lon <= 54) return 'ocean';
-      if (8 <= lat <= 34 && 68 <= lon <= 90) {
-        if (lat < 22 && (lon < 72 + (22 - lat)*0.6 || lon > 86 - (22 - lat)*0.7)) return 'ocean';
-        return 'land';
-      }
-      if (10 <= lat <= 22 && 82 <= lon <= 94) return 'ocean';
-      if (5 <= lat <= 20 && 105 <= lon <= 120) return 'shallow';
-      if (38 <= lat <= 46 && 85 <= lon <= 110) return 'desert';
-      return 'land';
-    }
-
-    // Australia
-    if (-44 <= lat <= -10 && 112 <= lon <= 154) {
-      if (-44 <= lat <= -33 && 120 <= lon <= 138) return 'shallow';
-      if (-30 <= lat <= -18 && 120 <= lon <= 142) return 'desert';
-      return 'land';
-    }
-
-    // Indonesia & Japan
-    if (-10 <= lat <= 15 && 95 <= lon <= 140) {
-      if ((lon + lat) % 4 === 0) return 'land';
-    }
-    if (30 <= lat <= 50 && 128 <= lon <= 146) {
-      if (Math.abs(lon - (130 + (lat - 30)*0.8)) < 3) return 'land';
-    }
-
-    if (lat > 72 || lat < -58) return 'shallow';
-    return 'ocean';
+    return { type: 'land', color: lat > 28 ? '#40916C' : '#2D6A4F' };
   }
 
-  // Exact Square-Pixel Color Palette
-  const colors = {
-    ocean:   ['#0D3B66', '#114B82'],
-    shallow: ['#1A659E', '#145385'],
-    land:    ['#2D6A4F', '#40916C'],
-    desert:  ['#C9A66B', '#B08968'],
-    ice:     ['#F1F5F9', '#FFFFFF']
-  };
-
-  // Render every single pixel onto the 360x180 canvas
-  for (let y = 0; y < h; y++) {
-    const lat = 90 - y;
-    for (let x = 0; x < w; x++) {
-      const lon = x - 180;
-      const cat = getPixelCategory(lon, lat);
-      const palette = colors[cat];
-      const col = palette[(x + y) % palette.length];
-      ctx.fillStyle = col;
-      ctx.fillRect(x, y, 1, 1);
-    }
+  // North America
+  if (lat >= 10 && lat <= 72 && lon >= -168 && lon <= -52) {
+    if (lat >= 18 && lat <= 30 && lon >= -98 && lon <= -82) return null; // Gulf of Mexico
+    if (lat >= 52 && lat <= 64 && lon >= -94 && lon <= -78) return null; // Hudson Bay
+    if (lat >= 28 && lat <= 40 && lon >= -118 && lon <= -102) return { type: 'desert', color: '#B69563' };
+    return { type: 'land', color: lat > 50 ? '#40916C' : '#2D6A4F' };
   }
 
-  // Highlight ISRO ISTRAC Bengaluru Ground Station (12.97°N, 77.59°E)
-  const bx = Math.round(77.59 + 180);
-  const by = Math.round(90 - 12.97);
-  ctx.fillStyle = '#FF4F00';
-  ctx.fillRect(bx - 1, by - 1, 2, 2);
+  // South America
+  if (lat >= -56 && lat < 12 && lon >= -82 && lon <= -34) {
+    if (lat < -20 && lon > -45 - (lat + 20) * 0.6) return null;
+    if (lat < -10 && lon < -80 + (lat + 10) * 0.4) return null;
+    if (lat < -35 && lon < -65) return { type: 'land', color: '#40916C' };
+    return { type: 'land', color: '#2D6A4F' };
+  }
 
-  const tex = new THREE.CanvasTexture(cvs);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.generateMipmaps = false;
-  return tex;
+  // Africa
+  if (lat >= -35 && lat <= 37 && lon >= -18 && lon <= 52) {
+    if (lat >= 12 && lat <= 28 && lon >= 33 && lon <= 43) return null; // Red Sea
+    if (lat < 5 && lon > 42 + (lat - 5) * 0.4) return null;
+    if (lat >= 16 && lat <= 32 && lon >= -14 && lon <= 35) return { type: 'desert', color: '#B69563' }; // Sahara
+    return { type: 'land', color: '#2D6A4F' };
+  }
+
+  // Europe
+  if (lat >= 36 && lat <= 71 && lon >= -10 && lon <= 42) {
+    if (lat >= 32 && lat <= 41 && lon >= -5 && lon <= 25) return null; // Mediterranean
+    if (lat >= 41 && lat <= 47 && lon >= 28 && lon <= 42) return null; // Black Sea
+    if (lat >= 54 && lat <= 65 && lon >= 16 && lon <= 26) return null; // Baltic
+    return { type: 'land', color: lat > 58 ? '#40916C' : '#2D6A4F' };
+  }
+
+  // Asia / Middle East / Siberia / East Asia / SE Asia
+  if (lat >= 5 && lat <= 76 && lon >= 40 && lon <= 145) {
+    if (lat >= 12 && lat <= 32 && lon >= 35 && lon <= 60) {
+      if (lat >= 15 && lat <= 28 && lon >= 38 && lon <= 55) return { type: 'desert', color: '#B69563' };
+      return { type: 'land', color: '#40916C' };
+    }
+    if (lat >= 36 && lat <= 47 && lon >= 47 && lon <= 54) return null; // Caspian
+    if (lat >= 36 && lat <= 46 && lon >= 80 && lon <= 110) return { type: 'desert', color: '#B69563' }; // Gobi
+    if (lat >= 10 && lat <= 22 && lon >= 82 && lon <= 94) return null; // Bay of Bengal
+    if (lat >= 5 && lat <= 20 && lon >= 105 && lon <= 120) return null; // South China Sea
+    if (lat >= 30 && lat <= 46 && lon >= 128 && lon <= 145) {
+      if (Math.abs(lon - (130 + (lat - 30) * 0.8)) < 3.5) return { type: 'land', color: '#2D6A4F' };
+    }
+    return { type: 'land', color: lat > 55 ? '#40916C' : '#2D6A4F' };
+  }
+
+  // Australia & New Zealand
+  if (lat >= -44 && lat <= -10 && lon >= 112 && lon <= 154) {
+    if (lat >= -44 && lat <= -33 && lon >= 122 && lon <= 138) return null;
+    if (lat >= -28 && lat <= -18 && lon >= 120 && lon <= 142) return { type: 'desert', color: '#B69563' }; // Outback
+    return { type: 'land', color: '#2D6A4F' };
+  }
+  if (lat >= -47 && lat <= -34 && lon >= 165 && lon <= 179) {
+    return { type: 'land', color: '#40916C' };
+  }
+
+  return null;
 }
 
-// 1. High-segment smooth sphere silhouette (NO triangular facets!)
-const smoothEarthGeo = new THREE.SphereGeometry(R_EARTH, 128, 128);
-const squarePixelEarthTex = createSquarePixelEarthTexture();
-const smoothEarthMat = new THREE.MeshPhongMaterial({
-  map: squarePixelEarthTex,
-  flatShading: false, // Smooth round silhouette
-  shininess: 12,
-  specular: new THREE.Color(0x1B3552),
-});
-const earthMesh = new THREE.Mesh(smoothEarthGeo, smoothEarthMat);
+// Generate the high-density small-triangle Earth with extruded continents
+function buildExtrudedTriangleEarth() {
+  // Detail = 5 produces 20,480 crisp micro-triangular facets
+  const baseGeo = new THREE.IcosahedronGeometry(R_EARTH, 5).toNonIndexed();
+  const pos = baseGeo.getAttribute('position');
+  const count = pos.count;
+  const colors = new Float32Array(count * 3);
+
+  const cForest   = new THREE.Color('#2D6A4F');
+  const cHighland = new THREE.Color('#40916C');
+  const cDesert   = new THREE.Color('#B69563');
+  const cIce      = new THREE.Color('#F1F5F9');
+  const cOcean1   = new THREE.Color('#0F3558');
+  const cOcean2   = new THREE.Color('#133E68');
+
+  const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+  const centroid = new THREE.Vector3();
+
+  for (let i = 0; i < count; i += 3) {
+    vA.fromBufferAttribute(pos, i);
+    vB.fromBufferAttribute(pos, i + 1);
+    vC.fromBufferAttribute(pos, i + 2);
+
+    centroid.copy(vA).add(vB).add(vC).divideScalar(3);
+    const len = centroid.length();
+    const lat = Math.asin(Math.min(Math.max(centroid.y / len, -1), 1)) * 180 / Math.PI;
+    const lon = Math.atan2(centroid.z, centroid.x) * 180 / Math.PI;
+
+    const biome = isLandBiome(lat, lon);
+
+    if (biome) {
+      // Land: physically extrude outward by +0.42 units (real 3D elevation!)
+      const rLand = R_EARTH + 0.42;
+      vA.normalize().multiplyScalar(rLand);
+      vB.normalize().multiplyScalar(rLand);
+      vC.normalize().multiplyScalar(rLand);
+
+      pos.setXYZ(i,     vA.x, vA.y, vA.z);
+      pos.setXYZ(i + 1, vB.x, vB.y, vB.z);
+      pos.setXYZ(i + 2, vC.x, vC.y, vC.z);
+
+      // Subtle ±3% brightness variation
+      const jitter = 1.0 + (Math.random() - 0.5) * 0.06;
+      let baseCol = cForest;
+      if (biome.type === 'ice') baseCol = cIce;
+      else if (biome.type === 'desert') baseCol = cDesert;
+      else if (biome.type === 'highland') baseCol = cHighland;
+
+      const r = Math.min(1, Math.max(0, baseCol.r * jitter));
+      const g = Math.min(1, Math.max(0, baseCol.g * jitter));
+      const b = Math.min(1, Math.max(0, baseCol.b * jitter));
+
+      for (let k = 0; k < 3; k++) {
+        colors[(i + k) * 3]     = r;
+        colors[(i + k) * 3 + 1] = g;
+        colors[(i + k) * 3 + 2] = b;
+      }
+    } else {
+      // Ocean: keep radius at 63.71, contrast under 4% (no noisy grid)
+      const oceanJitter = 1.0 + (Math.random() - 0.5) * 0.035;
+      const baseCol = ((i / 3) % 2 === 0) ? cOcean1 : cOcean2;
+      const r = Math.min(1, Math.max(0, baseCol.r * oceanJitter));
+      const g = Math.min(1, Math.max(0, baseCol.g * oceanJitter));
+      const b = Math.min(1, Math.max(0, baseCol.b * oceanJitter));
+
+      for (let k = 0; k < 3; k++) {
+        colors[(i + k) * 3]     = r;
+        colors[(i + k) * 3 + 1] = g;
+        colors[(i + k) * 3 + 2] = b;
+      }
+    }
+  }
+
+  pos.needsUpdate = true;
+  baseGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  baseGeo.computeVertexNormals();
+
+  const mat = new THREE.MeshPhongMaterial({
+    vertexColors: true,
+    flatShading: true,
+    shininess: 14,
+    specular: new THREE.Color(0x1B3552),
+  });
+  return new THREE.Mesh(baseGeo, mat);
+}
+
+const earthMesh = buildExtrudedTriangleEarth();
 earthMesh.receiveShadow = true;
 earthGroup.add(earthMesh);
 
-// 2. Crisp Lat/Lon Geodesic Wireframe Overlay
+// Crisp Lat/Lon Geodesic Wireframe Overlay
 const gridGeo = new THREE.IcosahedronGeometry(R_EARTH * 1.002, 4);
 const gridMat = new THREE.MeshBasicMaterial({
   color: 0x1E4A75,
   wireframe: true,
   transparent: true,
-  opacity: 0.28,
+  opacity: 0.25,
 });
 const gridMesh = new THREE.Mesh(gridGeo, gridMat);
 earthGroup.add(gridMesh);
 
-// 3. Subtle Atmosphere Horizon Rim
+// Subtle Atmosphere Horizon Rim
 const atmGeo = new THREE.SphereGeometry(R_EARTH * 1.026, 64, 64);
 const atmMat = new THREE.MeshPhongMaterial({
   color: 0x38BDF8,
@@ -1617,11 +1716,11 @@ const atmMat = new THREE.MeshPhongMaterial({
 });
 earthGroup.add(new THREE.Mesh(atmGeo, atmMat));
 
-// 4. ISRO ISTRAC Ground Station 3D Physical Marker
+// ISRO ISTRAC Ground Station 3D Marker (Bengaluru at 12.97°N, 77.59°E)
 (function buildISTRACMarker() {
   const lat = 12.97 * Math.PI / 180;
   const lon = 77.59 * Math.PI / 180;
-  const r = R_EARTH * 1.012;
+  const r = (R_EARTH + 0.42) * 1.004; // Sits on top of the extruded Indian landmass
   const x = r * Math.cos(lat) * Math.cos(lon);
   const y = r * Math.sin(lat);
   const z = r * Math.cos(lat) * Math.sin(lon);
@@ -1637,7 +1736,7 @@ earthGroup.add(new THREE.Mesh(atmGeo, atmMat));
 })();
 
 /* ============================================================
-   ORBIT RING HELPERS
+   ORBIT RINGS
    ============================================================ */
 function createOrbitRing(radius, inclDeg, color, opacity=0.35) {
   const pts = [];
@@ -1660,7 +1759,7 @@ const satOrbitRing = createOrbitRing(R_ORBIT, 32, 0x3B82F6, 0.40);
 orbitRingsGroup.add(satOrbitRing);
 
 /* ============================================================
-   ISRO CARTOSAT-3 SATELLITE (TRUE SCALE + DETAIL)
+   ISRO CARTOSAT-3 SATELLITE
    ============================================================ */
 const satGroup = new THREE.Group();
 scene.add(satGroup);
@@ -1706,7 +1805,7 @@ plumeMesh.visible = false;
 satGroup.add(plumeMesh);
 
 /* ============================================================
-   SCREEN-SPACE BEACON DOTS (ALWAYS VISIBLE AT ANY ZOOM)
+   SCREEN-SPACE BEACON DOTS
    ============================================================ */
 function makeBeaconSphere(colorHex) {
   const geo = new THREE.SphereGeometry(0.65, 8, 8);
@@ -1797,6 +1896,49 @@ function updateActiveThreatSelection() {
 updateActiveThreatSelection();
 
 /* ============================================================
+   3. ZERO-BLINK PERMANENT DOM SWARM QUEUE (STRICT DOM RULE)
+   ============================================================ */
+const swarmListContainer = document.getElementById('swarm-list');
+
+// Build the 7 debris row DOM elements ONCE at boot
+(function initSwarmQueueDOM() {
+  swarmListContainer.innerHTML = '';
+  debrisSwarm.forEach((d) => {
+    const row = document.createElement('div');
+    row.className = d.isActive ? 'swarm-item active-threat' : 'swarm-item';
+    row.dataset.debrisId = String(d.id);
+    row.innerHTML = `
+      <i data-lucide="disc" class="swarm-icon"></i>
+      <span class="swarm-name">${d.name}</span>
+      <span class="swarm-miss"><span class="dist-val">${d.missDistKm.toFixed(2)}</span> km</span>
+    `;
+    swarmListContainer.appendChild(row);
+  });
+
+  // Single persistent event delegation listener — guaranteed 100% click response!
+  swarmListContainer.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-debris-id]');
+    if (!row) return;
+    const targetObj = debrisSwarm.find(d => String(d.id) === row.dataset.debrisId);
+    if (targetObj) flyToObject(targetObj);
+  });
+})();
+
+// Inside animate loop: ONLY update textContent and toggle classes (NEVER innerHTML)
+function updateSwarmQueueDOM() {
+  debrisSwarm.forEach((d) => {
+    const row = swarmListContainer.querySelector(`[data-debris-id="${d.id}"]`);
+    if (row) {
+      const distEl = row.querySelector('.dist-val');
+      if (distEl) distEl.textContent = d.missDistKm.toFixed(2);
+      row.classList.toggle('active-threat', d.isActive);
+      const missEl = row.querySelector('.swarm-miss');
+      if (missEl) missEl.classList.toggle('close', d.missDistKm < SAFETY_KM);
+    }
+  });
+}
+
+/* ============================================================
    SATELLITE & DEBRIS ORBITAL POSITIONS
    ============================================================ */
 let satAngle = 0;
@@ -1820,93 +1962,126 @@ function getDebrisPosition(d) {
 }
 
 /* ============================================================
-   GOOGLE EARTH GSAP FLY-TO CAMERA ANIMATIONS
+   4. SPHERICAL ORBIT FLY-TO ANIMATION (NEVER CUT THROUGH EARTH!)
    ============================================================ */
-function flyToCamera(targetPos, desiredDist = 12, onComplete = null) {
-  isFlyingTo = true;
-  _v1.copy(camera.position).sub(targetPos).normalize().multiplyScalar(desiredDist).add(targetPos);
+function flyToObject(targetObj) {
+  if (!targetObj) return;
 
+  trackedTarget = targetObj;
+  cameraMode = targetObj === satGroup ? 'sat' : `debris-${targetObj.id ?? 0}`;
+  updateCameraHUD();
+
+  if (targetObj !== satGroup && targetObj.id !== undefined) {
+    activeThreatIdx = targetObj.id;
+    debrisSwarm.forEach((d, j) => { d.isActive = (j === targetObj.id); });
+  }
+
+  const startDir = camera.position.clone().normalize();
+  const startDist = camera.position.length();
+  const startTarget = controls.target.clone();
+
+  isFlyingTo = true;
   if (window.gsap) {
     gsap.killTweensOf(camera.position);
     gsap.killTweensOf(controls.target);
 
-    // Smooth Google Earth Fly-To easing
-    gsap.to(controls.target, {
-      x: targetPos.x,
-      y: targetPos.y,
-      z: targetPos.z,
-      duration: 1.25,
-      ease: "power2.out"
-    });
+    const anim = { t: 0 };
+    gsap.to(anim, {
+      t: 1.0,
+      duration: 1.45,
+      ease: "power3.inOut",
+      onUpdate: () => {
+        const t = anim.t;
+        // Live world position of target
+        const targetPos = (targetObj === satGroup) ? getSatPosition(satAngle) : (targetObj.mesh ? targetObj.mesh.position.clone() : targetObj.position.clone());
+        const endDir = targetPos.clone().normalize();
+        const endDist = targetPos.length() + 5.5;
 
-    gsap.to(camera.position, {
-      x: _v1.x,
-      y: _v1.y,
-      z: _v1.z,
-      duration: 1.35,
-      ease: "power2.inOut",
-      onUpdate: () => controls.update(),
+        // Quaternion slerp for true spherical curvature around Earth
+        const qStart = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), startDir);
+        const qEnd = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), endDir);
+        const qCur = qStart.clone().slerp(qEnd, t);
+        const curDir = new THREE.Vector3(0, 1, 0).applyQuaternion(qCur).normalize();
+
+        // Parabolic altitude arc boost (mid-flight radius >= 95.0, well above Earth!)
+        const arcBoost = Math.sin(t * Math.PI) * 35.0;
+        const curDist = THREE.MathUtils.lerp(startDist, endDist, t) + arcBoost;
+
+        camera.position.copy(curDir.multiplyScalar(curDist));
+        controls.target.lerpVectors(startTarget, targetPos, t);
+        controls.update();
+      },
       onComplete: () => {
         isFlyingTo = false;
-        if (onComplete) onComplete();
       }
     });
   } else {
+    // Fallback
+    const targetPos = (targetObj === satGroup) ? getSatPosition(satAngle) : (targetObj.mesh ? targetObj.mesh.position.clone() : targetObj.position.clone());
     controls.target.copy(targetPos);
-    camera.position.copy(_v1);
+    camera.position.copy(targetPos.clone().normalize().multiplyScalar(targetPos.length() + 5.5));
     controls.update();
     isFlyingTo = false;
-    if (onComplete) onComplete();
   }
 }
 
-function focusObject(mode, idx) {
-  cameraMode = mode === 'debris' ? `debris-${idx}` : mode;
+function flyToGlobal() {
+  trackedTarget = null;
+  cameraMode = 'global';
+  updateCameraHUD();
 
+  const startPos = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const endPos = new THREE.Vector3(0, 48, 150);
+
+  isFlyingTo = true;
+  if (window.gsap) {
+    gsap.killTweensOf(camera.position);
+    gsap.killTweensOf(controls.target);
+
+    const anim = { t: 0 };
+    gsap.to(anim, {
+      t: 1.0,
+      duration: 1.25,
+      ease: "power2.inOut",
+      onUpdate: () => {
+        const t = anim.t;
+        camera.position.lerpVectors(startPos, endPos, t);
+        controls.target.lerpVectors(startTarget, WORLD_CENTER, t);
+        controls.update();
+      },
+      onComplete: () => {
+        controls.target.copy(WORLD_CENTER);
+        isFlyingTo = false;
+      }
+    });
+  } else {
+    camera.position.copy(endPos);
+    controls.target.copy(WORLD_CENTER);
+    controls.update();
+    isFlyingTo = false;
+  }
+}
+
+function updateCameraHUD() {
   const btnSat = document.getElementById('btn-focus-sat');
   const btnThreat = document.getElementById('btn-focus-threat');
   const dockCam = document.getElementById('dock-cam');
   const camLbl = document.getElementById('cam-label');
 
-  btnSat.classList.toggle('active', mode === 'sat');
-  btnThreat.classList.toggle('active', mode === 'debris');
+  btnSat.classList.toggle('active', cameraMode === 'sat');
+  btnThreat.classList.toggle('active', cameraMode.startsWith('debris'));
 
-  if (mode === 'global') {
+  if (cameraMode === 'global') {
     dockCam.className = 'dock-cam';
     camLbl.textContent = 'Global View';
-
-    if (window.gsap) {
-      isFlyingTo = true;
-      gsap.killTweensOf(camera.position);
-      gsap.killTweensOf(controls.target);
-
-      gsap.to(controls.target, { x: 0, y: 0, z: 0, duration: 1.1, ease: "power2.out" });
-      gsap.to(camera.position, {
-        x: 0, y: 48, z: 150,
-        duration: 1.3,
-        ease: "power2.inOut",
-        onUpdate: () => controls.update(),
-        onComplete: () => { isFlyingTo = false; }
-      });
-    } else {
-      controls.target.set(0, 0, 0);
-      camera.position.set(0, 48, 150);
-      controls.update();
-    }
-  } else if (mode === 'sat') {
+  } else if (cameraMode === 'sat') {
     dockCam.className = 'dock-cam safe';
     camLbl.textContent = 'Tracking CARTOSAT-3';
-    const sPos = getSatPosition(satAngle);
-    flyToCamera(sPos, 12);
   } else {
     dockCam.className = 'dock-cam locked';
-    activeThreatIdx = idx;
-    debrisSwarm.forEach((d, j) => { d.isActive = (j === idx); });
-    const targetDebris = debrisSwarm[idx];
+    const targetDebris = debrisSwarm[activeThreatIdx];
     camLbl.textContent = `Tracking ${targetDebris.name.split(' ')[0]}`;
-
-    const dPos = getDebrisPosition(targetDebris);
-    flyToCamera(dPos, 10);
   }
 }
 
@@ -1924,7 +2099,7 @@ canvas.addEventListener('click', (e) => {
   lastClickMs = now;
 
   if (isDblClick) {
-    focusObject('global');
+    flyToGlobal();
     return;
   }
 
@@ -1937,7 +2112,7 @@ canvas.addEventListener('click', (e) => {
   const satHits = raycaster.intersectObjects(satGroup.children, true);
   const satBHit = raycaster.intersectObject(satBeacon);
   if (satHits.length > 0 || satBHit.length > 0) {
-    focusObject('sat');
+    flyToObject(satGroup);
     return;
   }
 
@@ -1947,40 +2122,14 @@ canvas.addEventListener('click', (e) => {
     const dHits = raycaster.intersectObject(d.mesh, true);
     const dBHit = raycaster.intersectObject(d.beacon);
     if (dHits.length > 0 || dBHit.length > 0) {
-      focusObject('debris', i);
+      flyToObject(d);
       return;
     }
   }
 });
 
 /* ============================================================
-   CAMERA CHASE & DELTA-TRANSLATION (PRESERVES USER ZOOM)
-   ============================================================ */
-function updateCameraTarget(satPos) {
-  if (isFlyingTo) return;
-
-  if (cameraMode === 'global') {
-    controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
-    return;
-  }
-
-  let goalPos;
-  if (cameraMode === 'sat') {
-    goalPos = satPos;
-  } else {
-    const idx = parseInt(cameraMode.split('-')[1]);
-    if (debrisSwarm[idx]) goalPos = getDebrisPosition(debrisSwarm[idx]);
-    else { cameraMode = 'global'; return; }
-  }
-
-  // Delta shift preserves OrbitControls distance perfectly
-  _v1.copy(goalPos).sub(controls.target);
-  camera.position.add(_v1.multiplyScalar(0.09));
-  controls.target.lerp(goalPos, 0.09);
-}
-
-/* ============================================================
-   SIMULATION ANIMATION LOOP
+   2. SIMULATION ANIMATION LOOP (LOCKED CENTER + AUTO-DETACH ZOOM)
    ============================================================ */
 let lastFrameTime = performance.now();
 
@@ -2000,8 +2149,8 @@ function animate() {
     orbitCount++;
   }
 
-  // 1. Earth: Pin strictly at origin + slow calm realistic axial rotation
-  earthGroup.position.set(0, 0, 0);
+  // 1. Earth: Permanent World Center + Calm Realistic Axial Rotation
+  earthGroup.position.copy(WORLD_CENTER);
   if (!paused) {
     earthGroup.rotation.y += 0.00025 * speedMult;
   }
@@ -2071,12 +2220,33 @@ function animate() {
     }
   });
 
-  // Render Telemetry & UI
-  renderSwarmList();
-  renderActiveThreatTelemetry();
+  // 4. Camera Chase & Auto-Detach Zoom Out Logic
+  if (!isFlyingTo) {
+    if (trackedTarget) {
+      const targetPos = (trackedTarget === satGroup) ? satPos : (trackedTarget.mesh ? trackedTarget.mesh.position : trackedTarget.position);
+      const distToTarget = camera.position.distanceTo(controls.target);
 
-  // Camera Tracking & Smooth Zoom
-  updateCameraTarget(satPos);
+      // Auto-Detach on Zoom-Out: If user zooms out past 45 units, release tracking and re-center Earth!
+      if (distToTarget > 45.0) {
+        trackedTarget = null;
+        cameraMode = 'global';
+        updateCameraHUD();
+        controls.target.lerp(WORLD_CENTER, 0.08);
+      } else {
+        // Delta shift preserves user OrbitControls orientation
+        _v1.copy(targetPos).sub(controls.target);
+        camera.position.add(_v1);
+        controls.target.copy(targetPos);
+      }
+    } else {
+      // Global View: controls.target MUST stay strictly at (0, 0, 0)
+      controls.target.lerp(WORLD_CENTER, 0.1);
+    }
+  }
+
+  // 5. Render Zero-Blink Swarm Queue & Telemetry
+  updateSwarmQueueDOM();
+  renderActiveThreatTelemetry();
 
   // Orbit & Grid Visibility
   orbitRingsGroup.visible = tweaks.orbits;
@@ -2100,32 +2270,8 @@ function animate() {
 }
 
 /* ============================================================
-   SIDEBAR TELEMETRY RENDERING
+   ACTIVE THREAT TELEMETRY
    ============================================================ */
-let lastListUpdate = 0;
-function renderSwarmList() {
-  const now = performance.now();
-  if (now - lastListUpdate < 150) return;
-  lastListUpdate = now;
-
-  const container = document.getElementById('swarm-list');
-  let html = '';
-  debrisSwarm.forEach((d, i) => {
-    const isAct = d.isActive;
-    const cls = isAct ? 'swarm-item active-threat' : 'swarm-item';
-    const missCls = d.missDistKm < SAFETY_KM ? 'swarm-miss close' : 'swarm-miss';
-    const iconName = isAct ? 'alert-circle' : 'disc';
-    html += `
-      <div class="${cls}" onclick="focusObject('debris', ${i})">
-        <i data-lucide="${iconName}" class="swarm-icon"></i>
-        <span class="swarm-name">${d.name}</span>
-        <span class="${missCls}">${d.missDistKm.toFixed(2)} km</span>
-      </div>`;
-  });
-  container.innerHTML = html;
-  if (window.lucide) lucide.createIcons();
-}
-
 function renderActiveThreatTelemetry() {
   const active = debrisSwarm[activeThreatIdx];
   if (!active) return;
