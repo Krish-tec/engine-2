@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QuantumOrbit · Engine 2 — Autonomous Collision Avoidance</title>
   
-  <!-- Google Fonts: Space Grotesk & JetBrains Mono -->
+  <!-- Clean Inter Font (All weights) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Three.js & OrbitControls -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   
-  <!-- GSAP for Smooth Spherical Fly-To Transitions -->
+  <!-- GSAP for Smooth Google Earth Fly-To Transitions -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   
   <!-- Lucide Icons -->
@@ -22,16 +22,15 @@
 
   <style>
     /* =========================================================================
-       1. BORDERLESS MINIMAL SWISS DESIGN SYSTEM + DUAL THEMES
+       1. 3-WAY THEME ENGINE: DARK (DEFAULT) | LIGHT | MONO (NOTHING OS)
        ========================================================================= */
-    :root {
-      /* Dark Theme (Default) */
+    :root, [data-theme="dark"] {
       --bg:             #09090B;
       --surface:        #111114;
       --surface-2:      #16161A;
       --surface-3:      #1E1E24;
       --surface-hover:  #26262E;
-      --border:         rgba(255, 255, 255, 0.05);
+      --border:         rgba(255, 255, 255, 0.06);
       --border-hard:    #222228;
       --border-focus:   #3A3A44;
 
@@ -52,6 +51,11 @@
 
       --burn:           #F59E0B;
 
+      /* Primary Button Styles */
+      --btn-pri-bg:     #FF4F00;
+      --btn-pri-fg:     #FFFFFF;
+      --btn-pri-hover:  #E04500;
+
       /* Space Canvas Background is ALWAYS deep cosmic black */
       --canvas-bg:      #040508;
 
@@ -62,18 +66,16 @@
       --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.3);
       --shadow-md:      0 4px 16px rgba(0, 0, 0, 0.35);
       --easing:         cubic-bezier(0.22, 1, 0.36, 1);
-      --font-display:   'Space Grotesk', sans-serif;
-      --font-mono:      'JetBrains Mono', monospace;
     }
 
     [data-theme="light"] {
-      /* Bright Mode (UI Chrome only — Canvas remains space black) */
+      /* Bright Studio Mode */
       --bg:             #F8FAFC;
       --surface:        #FFFFFF;
       --surface-2:      #F1F5F9;
       --surface-3:      #E2E8F0;
       --surface-hover:  #CBD5E1;
-      --border:         rgba(0, 0, 0, 0.06);
+      --border:         rgba(0, 0, 0, 0.07);
       --border-hard:    #E2E8F0;
       --border-focus:   #94A3B8;
 
@@ -92,7 +94,45 @@
 
       --burn:           #D97706;
 
-      /* Space remains deep black even in bright theme */
+      --btn-pri-bg:     #FF4F00;
+      --btn-pri-fg:     #FFFFFF;
+      --btn-pri-hover:  #E04500;
+
+      --canvas-bg:      #040508;
+    }
+
+    [data-theme="mono"] {
+      /* High-Craft Pure Monochrome / Nothing OS Edition */
+      --bg:             #000000;
+      --surface:        #0A0A0A;
+      --surface-2:      #141414;
+      --surface-3:      #1F1F1F;
+      --surface-hover:  #262626;
+      --border:         #262626;
+      --border-hard:    #333333;
+      --border-focus:   #525252;
+
+      --text-1:         #FFFFFF;
+      --text-2:         #A3A3A3;
+      --text-3:         #737373;
+
+      /* Stark White Accent */
+      --accent:         #FFFFFF;
+      --accent-hover:   #E5E5E5;
+      --accent-dim:     rgba(255, 255, 255, 0.12);
+      --accent-ring:    rgba(255, 255, 255, 0.38);
+
+      --safe:           #FFFFFF;
+      --safe-dim:       rgba(255, 255, 255, 0.10);
+      --safe-ring:      rgba(255, 255, 255, 0.35);
+
+      --burn:           #E5E5E5;
+
+      /* Solid White Primary Button with Inverted Black Text */
+      --btn-pri-bg:     #FFFFFF;
+      --btn-pri-fg:     #000000;
+      --btn-pri-hover:  #E5E5E5;
+
       --canvas-bg:      #040508;
     }
 
@@ -104,11 +144,16 @@
 
     html, body {
       height: 100%;
-      font-family: var(--font-display);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text-1);
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
+    }
+
+    /* Tabular numbers across data elements */
+    .num-tabular, .tele-value, .dock-clock, .compare-cell-val, .dodge-num, .stat-num, input[type=range] {
+      font-variant-numeric: tabular-nums;
     }
 
     /* ---- LAYOUT SHELL ---- */
@@ -120,7 +165,9 @@
       position: relative;
     }
 
-    /* ---- TOPBAR ---- */
+    /* =========================================================================
+       2. TOP BAR — DE-CLUTTERED & STREAMLINED
+       ========================================================================= */
     #topbar {
       grid-column: 1 / -1;
       grid-row: 1;
@@ -133,110 +180,84 @@
       z-index: 50;
       user-select: none;
     }
+
+    /* Clean Typographic Wordmark Only (No orange icon box) */
     .tb-logo {
       display: flex;
       align-items: center;
-      gap: 10px;
       cursor: pointer;
     }
-    .tb-logo-mark {
-      width: 28px; height: 28px;
-      background: var(--accent);
-      border-radius: var(--r-sm);
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      color: #fff;
-    }
-    .tb-logo-mark svg { width: 16px; height: 16px; }
     .tb-wordmark {
-      font-size: 13.5px;
+      font-size: 14.5px;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
       color: var(--text-1);
     }
-    .tb-sep { width: 1px; height: 20px; background: var(--border-hard); margin: 0 16px; }
-    .tb-mission {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-3);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      font-family: var(--font-mono);
-    }
 
-    /* Quick Camera Focus Shortcuts */
-    .tb-quick-focus {
+    /* Compact Satellite Focus Button */
+    .tb-mid-actions {
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-left: 16px;
+      margin-left: 20px;
     }
-    .tb-focus-btn {
-      display: flex; align-items: center; gap: 6px;
-      padding: 4px 10px;
+    .tb-sat-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
       border-radius: var(--r-sm);
       font-size: 11px;
-      font-family: var(--font-mono);
       font-weight: 600;
+      letter-spacing: 0.05em;
       background: var(--surface-2);
       border: 1px solid var(--border);
       color: var(--text-2);
       cursor: pointer;
       transition: all 140ms ease;
     }
-    .tb-focus-btn svg { width: 13px; height: 13px; stroke-width: 1.8; }
-    .tb-focus-btn:hover {
+    .tb-sat-btn svg { width: 14px; height: 14px; stroke-width: 1.8; }
+    .tb-sat-btn:hover {
       background: var(--surface-3);
       color: var(--text-1);
       border-color: var(--border-hard);
     }
-    .tb-focus-btn.active {
+    .tb-sat-btn.active {
       border-color: var(--accent-ring);
       background: var(--accent-dim);
       color: var(--accent);
     }
 
-    /* Threat Status Indicator */
-    .tb-threat-badge {
-      display: flex; align-items: center; gap: 7px;
-      margin-left: 16px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      font-family: var(--font-mono);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      border: 1px solid var(--accent-ring);
-      background: var(--accent-dim);
-      color: var(--accent);
-      cursor: pointer;
-      transition: all 180ms ease;
-    }
-    .tb-threat-badge svg { width: 13px; height: 13px; }
-    .tb-threat-badge:hover { background: rgba(255, 79, 0, 0.2); }
-    .tb-safe-pill {
+    /* Live Intercept Status Banner (Appears only during collision course) */
+    #intercept-banner {
       display: none;
-      align-items: center; gap: 6px;
+      align-items: center;
+      gap: 8px;
       margin-left: 16px;
       padding: 4px 12px;
       border-radius: 20px;
       font-size: 11px;
       font-weight: 700;
-      font-family: var(--font-mono);
       letter-spacing: 0.04em;
-      text-transform: uppercase;
-      border: 1px solid var(--safe-ring);
-      background: var(--safe-dim);
-      color: var(--safe);
-      cursor: pointer;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #EF4444;
+      animation: pulse-intercept 1s infinite alternate;
     }
-    .tb-safe-pill svg { width: 13px; height: 13px; }
+    [data-theme="mono"] #intercept-banner {
+      background: #FFFFFF;
+      border-color: #FFFFFF;
+      color: #000000;
+    }
+    @keyframes pulse-intercept {
+      from { opacity: 0.75; transform: scale(0.98); }
+      to   { opacity: 1.0; transform: scale(1.0); }
+    }
 
-    /* Navigation Pills */
+    /* Pure Text Navigation Tabs (No globe/book icons) */
     .tb-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
     .tb-pill {
-      display: flex; align-items: center; gap: 7px;
+      display: inline-flex;
+      align-items: center;
       padding: 6px 14px;
       border-radius: 20px;
       font-size: 12.5px;
@@ -246,30 +267,52 @@
       transition: all 150ms ease;
       border: 1px solid transparent;
       background: transparent;
-      font-family: var(--font-display);
+      font-family: inherit;
     }
-    .tb-pill svg { width: 14px; height: 14px; stroke-width: 1.8; }
     .tb-pill:hover { background: var(--surface-2); color: var(--text-1); }
     .tb-pill.active {
       background: var(--accent-dim);
       color: var(--accent);
       border-color: var(--accent-ring);
     }
-
-    /* Theme Toggle */
-    .tb-actions { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
-    .tb-icon-btn {
-      width: 32px; height: 32px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: var(--r-sm);
-      background: transparent;
-      border: 1px solid var(--border-hard);
-      cursor: pointer;
-      color: var(--text-2);
-      transition: all 150ms ease;
+    [data-theme="mono"] .tb-pill.active {
+      background: #FFFFFF;
+      color: #000000;
+      border-color: #FFFFFF;
     }
-    .tb-icon-btn svg { width: 15px; height: 15px; stroke-width: 1.8; }
-    .tb-icon-btn:hover { background: var(--surface-2); color: var(--text-1); border-color: var(--border-focus); }
+
+    /* 3-Way Theme Switcher: Dark | Light | Mono */
+    .tb-theme-switcher {
+      display: flex;
+      align-items: center;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2px;
+      margin-left: 14px;
+    }
+    .theme-seg-btn {
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-3);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .theme-seg-btn:hover {
+      color: var(--text-1);
+    }
+    .theme-seg-btn.active {
+      background: var(--surface-3);
+      color: var(--text-1);
+    }
+    [data-theme="mono"] .theme-seg-btn.active {
+      background: #FFFFFF;
+      color: #000000;
+    }
 
     /* ---- 3D CANVAS WRAPPER ---- */
     #canvas-wrap {
@@ -286,34 +329,15 @@
       animation: shake 0.45s cubic-bezier(.36,.07,.19,.97) both;
     }
     @keyframes shake {
-      10%, 90% { transform: translate3d(-2px, 1px, 0); }
-      20%, 80% { transform: translate3d(3px, -2px, 0); }
-      30%, 50%, 70% { transform: translate3d(-4px, 3px, 0); }
-      40%, 60% { transform: translate3d(4px, -3px, 0); }
+      10%, 90% { transform: translate3d(-3px, 2px, 0); }
+      20%, 80% { transform: translate3d(4px, -3px, 0); }
+      30%, 50%, 70% { transform: translate3d(-5px, 4px, 0); }
+      40%, 60% { transform: translate3d(5px, -4px, 0); }
     }
 
     #three-canvas {
       display: block;
       width: 100%; height: 100%;
-    }
-
-    /* Canvas HUD Hint */
-    .canvas-hud-hint {
-      position: absolute;
-      bottom: 14px; left: 50%;
-      transform: translateX(-50%);
-      font-size: 11px;
-      font-family: var(--font-mono);
-      color: var(--text-3);
-      pointer-events: none;
-      white-space: nowrap;
-      letter-spacing: 0.04em;
-      background: rgba(0, 0, 0, 0.55);
-      padding: 4px 14px;
-      border-radius: 20px;
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      border: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     /* Object Tooltip */
@@ -325,15 +349,14 @@
       background: var(--surface);
       border: 1px solid var(--border-hard);
       border-radius: var(--r-sm);
-      font-size: 11px;
-      font-family: var(--font-mono);
+      font-size: 11.5px;
       color: var(--text-1);
       white-space: nowrap;
       box-shadow: var(--shadow-md);
       z-index: 20;
     }
 
-    /* ---- RIGHT SIDEBAR (BORDERLESS MINIMAL CARDS) ---- */
+    /* ---- RIGHT SIDEBAR ---- */
     #sidebar {
       grid-column: 2;
       grid-row: 2;
@@ -353,14 +376,18 @@
     }
     .sidebar-section:last-child { border-bottom: none; }
 
+    .section-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
     .section-label {
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--text-3);
-      font-family: var(--font-mono);
-      margin-bottom: 10px;
       display: flex; align-items: center; gap: 6px;
     }
     .section-label::before {
@@ -371,7 +398,38 @@
       border-radius: 2px;
     }
 
-    /* Borderless Minimal Cards */
+    /* Swarm Count Controller */
+    .swarm-counter-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .swarm-btn {
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xs);
+      color: var(--text-2);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .swarm-btn:hover {
+      background: var(--surface-3);
+      color: var(--text-1);
+      border-color: var(--border-hard);
+    }
+    .swarm-count-val {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-1);
+      min-width: 18px;
+      text-align: center;
+    }
+
+    /* Cards */
     .step-card {
       background: var(--surface-2);
       border: 1px solid var(--border);
@@ -383,7 +441,6 @@
     .step-num {
       font-size: 10px;
       font-weight: 700;
-      font-family: var(--font-mono);
       color: var(--accent);
       letter-spacing: 0.06em;
       margin-bottom: 4px;
@@ -407,27 +464,29 @@
       font-size: 11.5px;
     }
     .tele-row:last-child { border-bottom: none; }
-    .tele-label { color: var(--text-3); font-family: var(--font-mono); font-size: 10.5px; }
-    .tele-value { color: var(--text-1); font-family: var(--font-mono); font-weight: 600; font-size: 11px; }
+    .tele-label { color: var(--text-3); font-size: 11px; }
+    .tele-value { color: var(--text-1); font-weight: 600; font-size: 11.5px; }
     .tele-value.danger  { color: var(--accent); }
     .tele-value.safe    { color: var(--safe); }
     .tele-value.neutral { color: var(--text-2); }
+    [data-theme="mono"] .tele-value.danger { color: #FFFFFF; font-weight: 700; }
+    [data-theme="mono"] .tele-value.safe   { color: #FFFFFF; font-weight: 700; }
 
-    /* Swarm Mini Queue (Permanent DOM - Zero Blinking) */
+    /* Swarm Mini Queue */
     #swarm-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+      max-height: 220px;
+      overflow-y: auto;
+      scrollbar-width: thin;
     }
     .swarm-item {
       display: flex; align-items: center; gap: 8px;
-      padding: 7px 10px;
+      padding: 6px 10px;
       border-radius: var(--r-sm);
+      margin-bottom: 3px;
       border: 1px solid var(--border);
       background: transparent;
       cursor: pointer;
-      transition: background 140ms ease, border-color 140ms ease;
-      user-select: none;
+      transition: background 120ms, border-color 120ms;
     }
     .swarm-item:hover { background: var(--surface-2); border-color: var(--border-hard); }
     .swarm-item.active-threat {
@@ -438,20 +497,21 @@
       width: 14px; height: 14px; flex-shrink: 0; color: var(--text-3);
     }
     .swarm-item.active-threat .swarm-icon { color: var(--accent); }
-    .swarm-name { font-size: 11px; font-weight: 600; font-family: var(--font-mono); color: var(--text-1); flex: 1; }
-    .swarm-miss { font-size: 10.5px; font-family: var(--font-mono); color: var(--text-3); }
+    .swarm-name { font-size: 11px; font-weight: 600; color: var(--text-1); flex: 1; }
+    .swarm-miss { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
     .swarm-miss.close { color: var(--accent); font-weight: 700; }
+    [data-theme="mono"] .swarm-miss.close { color: #FFFFFF; }
 
     /* Progress bar */
     .progress-wrap { margin-top: 8px; }
-    .progress-label { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .progress-label { font-size: 10px; color: var(--text-3); margin-bottom: 4px; display: flex; justify-content: space-between; }
     .progress-track { height: 4px; background: var(--surface-3); border-radius: 2px; overflow: hidden; }
-    .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s var(--easing); }
-    .progress-fill.safe-fill { background: var(--safe); }
+    .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s var(--easing); }
+    [data-theme="mono"] .progress-fill { background: #FFFFFF; }
 
     /* Sliders */
     .slider-row { margin-bottom: 12px; }
-    .slider-row label { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .slider-row label { font-size: 11px; color: var(--text-3); display: flex; justify-content: space-between; margin-bottom: 6px; }
     .slider-row label span { color: var(--text-1); font-weight: 700; }
     input[type=range] {
       -webkit-appearance: none;
@@ -463,7 +523,7 @@
       -webkit-appearance: none;
       width: 14px; height: 14px;
       border-radius: 50%;
-      background: var(--accent);
+      background: var(--btn-pri-bg);
       cursor: grab;
       transition: transform 100ms;
     }
@@ -473,13 +533,12 @@
     .btn-optimize {
       width: 100%;
       padding: 10px 16px;
-      background: var(--accent);
-      color: #fff;
+      background: var(--btn-pri-bg);
+      color: var(--btn-pri-fg);
       border: none;
       border-radius: var(--r-md);
       font-size: 13px;
       font-weight: 700;
-      font-family: var(--font-display);
       letter-spacing: -0.01em;
       cursor: pointer;
       transition: background 150ms, transform 80ms;
@@ -487,7 +546,7 @@
       margin-top: 10px;
     }
     .btn-optimize svg { width: 15px; height: 15px; stroke-width: 2.2; }
-    .btn-optimize:hover { background: var(--accent-hover); }
+    .btn-optimize:hover { background: var(--btn-pri-hover); }
     .btn-optimize:active { transform: scale(0.98); }
     .btn-optimize:disabled { background: var(--surface-3); color: var(--text-3); cursor: not-allowed; transform: none; }
 
@@ -501,7 +560,6 @@
       font-size: 11.5px;
       font-weight: 600;
       color: var(--text-3);
-      font-family: var(--font-display);
       cursor: pointer;
       margin-top: 8px;
       transition: all 150ms ease;
@@ -512,6 +570,11 @@
       border-color: var(--accent-ring);
       color: var(--accent);
       background: var(--accent-dim);
+    }
+    [data-theme="mono"] .btn-impact:hover {
+      border-color: #FFFFFF;
+      color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.1);
     }
 
     /* Result Comparison */
@@ -528,11 +591,11 @@
       padding: 8px 10px;
       text-align: center;
     }
-    .compare-cell-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-family: var(--font-mono); margin-bottom: 4px; }
-    .compare-cell-val { font-size: 15px; font-weight: 700; font-family: var(--font-mono); color: var(--text-1); }
+    .compare-cell-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 4px; }
+    .compare-cell-val { font-size: 15px; font-weight: 700; color: var(--text-1); }
     .compare-cell-val.danger { color: var(--accent); }
     .compare-cell-val.safe   { color: var(--safe); }
-    .compare-cell-unit { font-size: 9px; color: var(--text-3); font-family: var(--font-mono); margin-top: 1px; }
+    .compare-cell-unit { font-size: 9px; color: var(--text-3); margin-top: 1px; }
 
     /* Strategy Badge */
     .strategy-badge {
@@ -540,7 +603,6 @@
       padding: 5px 10px;
       border-radius: 20px;
       font-size: 10px; font-weight: 700;
-      font-family: var(--font-mono);
       letter-spacing: 0.04em;
       text-transform: uppercase;
       background: var(--safe-dim);
@@ -549,6 +611,11 @@
       margin-top: 8px;
     }
     .strategy-badge svg { width: 12px; height: 12px; }
+    [data-theme="mono"] .strategy-badge {
+      background: #FFFFFF;
+      color: #000000;
+      border-color: #FFFFFF;
+    }
 
     /* Dodged Counter */
     .dodge-counter {
@@ -557,10 +624,10 @@
       background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: var(--r-md);
-      font-family: var(--font-mono);
     }
     .dodge-num { font-size: 32px; font-weight: 700; color: var(--safe); letter-spacing: -0.03em; line-height: 1; }
     .dodge-label { font-size: 10.5px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+    [data-theme="mono"] .dodge-num { color: #FFFFFF; }
 
     /* ---- BOTTOM DOCK ---- */
     #bottom-dock {
@@ -581,7 +648,6 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--text-3);
-      font-family: var(--font-mono);
       margin-right: 4px;
       white-space: nowrap;
     }
@@ -590,7 +656,6 @@
       border-radius: var(--r-sm);
       font-size: 11px;
       font-weight: 700;
-      font-family: var(--font-mono);
       color: var(--text-2);
       background: transparent;
       border: 1px solid var(--border-hard);
@@ -602,6 +667,11 @@
       background: var(--accent-dim);
       border-color: var(--accent-ring);
       color: var(--accent);
+    }
+    [data-theme="mono"] .dock-speed-btn.active {
+      background: #FFFFFF;
+      color: #000000;
+      border-color: #FFFFFF;
     }
     .dock-speed-btn.paused {
       background: var(--surface-2);
@@ -618,7 +688,6 @@
       border-radius: var(--r-sm);
       font-size: 11px;
       font-weight: 600;
-      font-family: var(--font-mono);
       color: var(--text-2);
       background: var(--surface-2);
       border: 1px solid var(--border);
@@ -637,10 +706,9 @@
     }
 
     .dock-clock {
-      font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-3);
-      letter-spacing: 0.06em;
+      letter-spacing: 0.04em;
     }
     .dock-clock span { color: var(--text-1); font-weight: 700; }
 
@@ -648,7 +716,6 @@
       margin-left: auto;
       display: flex; align-items: center; gap: 7px;
       font-size: 11px;
-      font-family: var(--font-mono);
       color: var(--text-3);
       cursor: pointer;
       padding: 4px 10px;
@@ -662,8 +729,9 @@
     }
     .dock-cam.locked { color: var(--accent); }
     .dock-cam.safe   { color: var(--safe); }
+    [data-theme="mono"] .dock-cam.locked { color: #FFFFFF; }
 
-    /* ---- GUIDE DRAWER (SLIDING ARCHITECTURE) ---- */
+    /* ---- GUIDE DRAWER ---- */
     #guide-drawer {
       position: fixed;
       inset: 48px 0 52px 0;
@@ -723,7 +791,7 @@
     .drawer-eyebrow {
       font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
       text-transform: uppercase; color: var(--accent);
-      font-family: var(--font-mono); margin-bottom: 8px;
+      margin-bottom: 8px;
     }
     .drawer-headline {
       font-size: 26px; font-weight: 700; letter-spacing: -0.03em;
@@ -749,40 +817,15 @@
       padding: 16px;
       text-align: center;
     }
-    .stat-num { font-size: 24px; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.03em; color: var(--text-1); }
+    .stat-num { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: var(--text-1); }
     .stat-num .stat-unit { font-size: 12px; color: var(--text-3); vertical-align: middle; }
-    .stat-name { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); font-family: var(--font-mono); margin-top: 3px; }
-
-    /* Engine cards */
-    .engine-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 28px; }
-    .engine-card {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: var(--r-md);
-      padding: 14px;
-      transition: border-color 200ms;
-    }
-    .engine-card:hover { border-color: var(--border-hard); }
-    .engine-card.active-engine { border-color: var(--accent-ring); background: var(--accent-dim); }
-    .engine-num { font-size: 10px; font-weight: 700; font-family: var(--font-mono); color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
-    .engine-name { font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 4px; letter-spacing: -0.01em; }
-    .engine-desc { font-size: 11.5px; color: var(--text-2); line-height: 1.5; }
-    .engine-active-badge {
-      display: inline-block;
-      margin-top: 7px;
-      font-size: 9px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; font-family: var(--font-mono);
-      color: var(--accent); background: var(--accent-dim);
-      padding: 2px 7px; border-radius: 20px;
-      border: 1px solid var(--accent-ring);
-    }
+    .stat-name { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); margin-top: 3px; }
 
     /* Benchmarks Table */
     .bench-table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 28px;
-      font-family: var(--font-mono);
       font-size: 11.5px;
       background: var(--surface-2);
       border-radius: var(--r-md);
@@ -806,6 +849,22 @@
     }
     .bench-table tr:last-child td { border-bottom: none; }
     .bench-highlight { color: var(--safe); font-weight: 700; }
+    [data-theme="mono"] .bench-highlight { color: #FFFFFF; }
+
+    /* Engine cards */
+    .engine-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 28px; }
+    .engine-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 14px;
+      transition: border-color 200ms;
+    }
+    .engine-card:hover { border-color: var(--border-hard); }
+    .engine-card.active-engine { border-color: var(--accent-ring); background: var(--accent-dim); }
+    .engine-num { font-size: 10px; font-weight: 700; color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+    .engine-name { font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 4px; letter-spacing: -0.01em; }
+    .engine-desc { font-size: 11.5px; color: var(--text-2); line-height: 1.5; }
 
     /* Scenario presets */
     .scenario-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
@@ -829,7 +888,7 @@
     }
     .scenario-icon svg { width: 16px; height: 16px; stroke-width: 1.8; }
     .scenario-title { font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 2px; }
-    .scenario-sub { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
+    .scenario-sub { font-size: 11px; color: var(--text-3); }
 
     /* ---- TOAST ---- */
     #toast {
@@ -841,7 +900,6 @@
       transition: opacity 250ms, transform 300ms var(--easing);
       z-index: 200;
       pointer-events: none;
-      font-family: var(--font-display);
     }
     #toast.show {
       opacity: 1;
@@ -858,6 +916,8 @@
     .toast-inner.success { background: var(--safe); color: #fff; }
     .toast-inner.danger  { background: var(--accent); color: #fff; }
     .toast-inner.info    { background: var(--surface-3); color: var(--text-1); border: 1px solid var(--border-hard); }
+    [data-theme="mono"] .toast-inner.danger  { background: #FFFFFF; color: #000000; }
+    [data-theme="mono"] .toast-inner.success { background: #FFFFFF; color: #000000; }
 
     /* Exploding Sparks */
     .particle {
@@ -868,7 +928,7 @@
       animation: explode var(--dur, 1.1s) var(--easing) forwards;
     }
     @keyframes explode {
-      0%   { opacity: 1; transform: translate(0,0) scale(1.2); }
+      0%   { opacity: 1; transform: translate(0,0) scale(1.4); }
       100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.1); }
     }
 
@@ -885,10 +945,9 @@
       box-shadow: var(--shadow-md), 0 8px 40px rgba(0,0,0,0.3);
       z-index: 90;
       display: none;
-      font-family: var(--font-display);
     }
     #tweaks-panel.visible { display: block; }
-    .tweaks-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 12px; font-family: var(--font-mono); }
+    .tweaks-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 12px; }
     .tweaks-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; color: var(--text-2); }
     .tweaks-toggle {
       width: 32px; height: 18px;
@@ -898,6 +957,7 @@
       transition: background 200ms;
     }
     .tweaks-toggle.on { background: var(--accent); }
+    [data-theme="mono"] .tweaks-toggle.on { background: #FFFFFF; }
     .tweaks-toggle::after {
       content: '';
       position: absolute;
@@ -907,6 +967,7 @@
       top: 3px; left: 3px;
       transition: left 200ms var(--easing);
     }
+    [data-theme="mono"] .tweaks-toggle.on::after { background: #000000; }
     .tweaks-toggle.on::after { left: 17px; }
     #tweaks-fab {
       position: fixed;
@@ -940,58 +1001,49 @@
 <div id="app">
 
   <!-- =========================================================================
-       TOP BAR
+       TOP BAR (CLEAN & DE-CLUTTERED)
        ========================================================================= -->
   <header id="topbar">
-    <div class="tb-logo" onclick="flyToGlobal()" title="Reset to Global View">
-      <div class="tb-logo-mark">
-        <i data-lucide="orbit"></i>
-      </div>
+    <!-- Clean Typographic Wordmark Only (No orange icon box) -->
+    <div class="tb-logo" onclick="focusObject('global')" title="Reset to Global View">
       <span class="tb-wordmark">QuantumOrbit</span>
     </div>
-    <div class="tb-sep"></div>
-    <span class="tb-mission">UC-096 · Engine 2 — CAM</span>
 
-    <!-- Quick Camera Focus Shortcuts -->
-    <div class="tb-quick-focus">
-      <button class="tb-focus-btn" id="btn-focus-sat" onclick="flyToObject(satGroup)" title="Fly to Satellite">
-        <i data-lucide="satellite"></i>
-        CARTOSAT-3
+    <!-- Single Compact Satellite Focus Button -->
+    <div class="tb-mid-actions">
+      <button class="tb-sat-btn" id="btn-focus-sat" onclick="focusObject('sat')" title="Fly to Satellite">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 7 9 3 5 7l4 4"/>
+          <path d="m17 11 4 4-4 4-4-4"/>
+          <path d="m8 12 4 4 6-6-4-4Z"/>
+          <path d="m16 8 3-3"/>
+          <path d="M9 21a6 6 0 0 0-6-6"/>
+        </svg>
+        <span>SATELLITE</span>
       </button>
-      <button class="tb-focus-btn" id="btn-focus-threat" onclick="flyToObject(debrisSwarm[activeThreatIdx])" title="Fly to Active Threat">
-        <i data-lucide="crosshair"></i>
-        <span id="tb-threat-quick-name">THREAT</span>
-      </button>
+
+      <!-- Collision Intercept Countdown Banner -->
+      <div id="intercept-banner">
+        <i data-lucide="alert-triangle" style="width:13px;height:13px"></i>
+        <span id="intercept-status-text">COLLISION COURSE LOCKED — IMPACT IN T-00:03</span>
+      </div>
     </div>
 
-    <!-- Live Threat Status Indicator -->
-    <div class="tb-threat-badge" id="tb-threat-pill" onclick="flyToObject(debrisSwarm[activeThreatIdx])" title="Click to track threat">
-      <i data-lucide="shield-alert"></i>
-      <span id="tb-threat-text">ACTIVE THREAT</span>
-    </div>
-    <div class="tb-safe-pill" id="tb-safe-pill" onclick="flyToObject(satGroup)" title="Click to track satellite">
-      <i data-lucide="shield-check"></i>
-      SAFE CLEARANCE
-    </div>
-
-    <!-- Navigation Pills -->
+    <!-- Navigation Tabs (Pure Text — No Icons) -->
     <nav class="tb-nav">
       <button class="tb-pill active" id="nav-sim" onclick="setView('sim')">
-        <i data-lucide="globe"></i>
         Live 3D Simulator
       </button>
       <button class="tb-pill" id="nav-guide" onclick="setView('guide')">
-        <i data-lucide="book-open"></i>
         Guide & Architecture
       </button>
     </nav>
 
-    <!-- Theme Toggle -->
-    <div class="tb-actions">
-      <button class="tb-icon-btn" id="theme-btn" title="Toggle Dark/Bright Theme" onclick="toggleTheme()">
-        <span id="theme-icon-dark"><i data-lucide="moon"></i></span>
-        <span id="theme-icon-light" style="display:none"><i data-lucide="sun"></i></span>
-      </button>
+    <!-- 3-Way Theme Switcher: Dark | Light | Mono -->
+    <div class="tb-theme-switcher" id="theme-switcher">
+      <button class="theme-seg-btn active" data-theme="dark" onclick="setTheme('dark')">Dark</button>
+      <button class="theme-seg-btn" data-theme="light" onclick="setTheme('light')">Light</button>
+      <button class="theme-seg-btn" data-theme="mono" onclick="setTheme('mono')">Mono</button>
     </div>
   </header>
 
@@ -1000,7 +1052,6 @@
        ========================================================================= -->
   <main id="canvas-wrap">
     <canvas id="three-canvas"></canvas>
-    <div class="canvas-hud-hint">Click Object or Beacon · Double-Click Space to Reset · Scroll to Zoom</div>
     <div id="obj-tooltip"></div>
   </main>
 
@@ -1011,7 +1062,9 @@
 
     <!-- STEP 1: Threat Detection -->
     <div class="sidebar-section">
-      <div class="section-label">Step 01 — Threat Detection</div>
+      <div class="section-label-row">
+        <div class="section-label">Step 01 — Threat Detection</div>
+      </div>
       <div class="step-card" id="card-threat">
         <div class="step-num">Active Conjunction</div>
         <div class="step-title" id="threat-name-display">COSMOS-1408 Frag</div>
@@ -1022,29 +1075,38 @@
         <div class="progress-wrap">
           <div class="progress-label">
             <span>Encounter Proximity</span>
-            <span id="progress-pct">78%</span>
+            <span id="progress-pct" class="num-tabular">78%</span>
           </div>
           <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:78%"></div></div>
         </div>
       </div>
     </div>
 
-    <!-- Active Swarm Queue (Zero-Blink Permanent DOM) -->
+    <!-- Active Swarm Queue with Dynamic Count Adjuster -->
     <div class="sidebar-section">
-      <div class="section-label">Multi-Debris Swarm Queue (7)</div>
+      <div class="section-label-row">
+        <div class="section-label">Debris Swarm (<span id="swarm-count-badge">7</span>)</div>
+        <div class="swarm-counter-ctrl">
+          <button class="swarm-btn" onclick="adjustSwarmCount(-1)" title="Remove debris object">−</button>
+          <span class="swarm-count-val num-tabular" id="swarm-count-val">7</span>
+          <button class="swarm-btn" onclick="adjustSwarmCount(1)" title="Add debris object">+</button>
+        </div>
+      </div>
       <div id="swarm-list"></div>
     </div>
 
     <!-- STEP 2: AI Decision -->
     <div class="sidebar-section">
-      <div class="section-label">Step 02 — AI Maneuver Decision</div>
+      <div class="section-label-row">
+        <div class="section-label">Step 02 — AI Maneuver Decision</div>
+      </div>
 
       <div class="slider-row">
-        <label>Time to TCA <span id="tca-h-label">2.5 h</span></label>
+        <label>Time to TCA <span id="tca-h-label" class="num-tabular">2.5 h</span></label>
         <input type="range" id="sl-tca" min="0.5" max="12" step="0.5" value="2.5">
       </div>
       <div class="slider-row">
-        <label>Predicted Miss Dist <span id="miss-pre-label">1.24 km</span></label>
+        <label>Predicted Miss Dist <span id="miss-pre-label" class="num-tabular">1.24 km</span></label>
         <input type="range" id="sl-miss" min="0.1" max="8" step="0.05" value="1.24">
       </div>
 
@@ -1053,7 +1115,7 @@
         Compute Optimal CAM
       </button>
 
-      <button class="btn-impact" onclick="simulateImpact()" title="Test collision animation and particle explosion">
+      <button class="btn-impact" onclick="triggerCollisionIntercept()" title="Trigger true physical intercept & collision">
         <i data-lucide="flame"></i>
         Simulate Critical Impact (&lt; 0.2 km)
       </button>
@@ -1061,7 +1123,9 @@
 
     <!-- STEP 3: Result -->
     <div class="sidebar-section">
-      <div class="section-label">Step 03 — Before / After Result</div>
+      <div class="section-label-row">
+        <div class="section-label">Step 03 — Before / After Result</div>
+      </div>
       <div class="compare-grid">
         <div class="compare-cell">
           <div class="compare-cell-label">Before</div>
@@ -1097,10 +1161,12 @@
 
     <!-- Dodged Counter -->
     <div class="sidebar-section">
-      <div class="section-label">Mission Score</div>
+      <div class="section-label-row">
+        <div class="section-label">Mission Score</div>
+      </div>
       <div class="dodge-counter">
         <div>
-          <div class="dodge-num" id="dodge-num">0</div>
+          <div class="dodge-num num-tabular" id="dodge-num">0</div>
           <div class="dodge-label">Conjunctions Avoided</div>
         </div>
       </div>
@@ -1128,10 +1194,10 @@
 
     <div class="dock-sep"></div>
 
-    <span class="dock-clock">MET <span id="dock-clock-val">+00:00:00</span></span>
-    <span class="dock-clock" style="margin-left:14px">Orbit <span id="dock-orbit-num">1</span></span>
+    <span class="dock-clock">MET <span id="dock-clock-val" class="num-tabular">+00:00:00</span></span>
+    <span class="dock-clock" style="margin-left:14px">Orbit <span id="dock-orbit-num" class="num-tabular">1</span></span>
 
-    <div class="dock-cam" id="dock-cam" onclick="flyToGlobal()">
+    <div class="dock-cam" id="dock-cam" onclick="focusObject('global')">
       <i data-lucide="compass"></i>
       <span id="cam-label">Global View</span>
     </div>
@@ -1140,7 +1206,7 @@
 </div>
 
 <!-- =========================================================================
-     SLIDING DRAWER (APPLE-STYLE GLASSMORPHISM)
+     SLIDING DRAWER
      ========================================================================= -->
 <div id="guide-drawer">
   <div class="drawer-backdrop" onclick="setView('sim')"></div>
@@ -1159,20 +1225,22 @@
 
       <div class="stat-strip">
         <div class="stat-cell">
-          <div class="stat-num">27<span class="stat-unit">K+</span></div>
+          <div class="stat-num num-tabular">27<span class="stat-unit">K+</span></div>
           <div class="stat-name">Tracked Debris</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-num">11.4<span class="stat-unit">km/s</span></div>
+          <div class="stat-num num-tabular">11.4<span class="stat-unit">km/s</span></div>
           <div class="stat-name">Encounter Speed</div>
         </div>
         <div class="stat-cell">
-          <div class="stat-num">5.0<span class="stat-unit">km</span></div>
+          <div class="stat-num num-tabular">5.0<span class="stat-unit">km</span></div>
           <div class="stat-name">Safety Threshold</div>
         </div>
       </div>
 
-      <div class="section-label" style="margin-bottom:12px">Validated AI & Optimization Benchmarks</div>
+      <div class="section-label-row" style="margin-bottom:12px">
+        <div class="section-label">Validated AI & Optimization Benchmarks</div>
+      </div>
       <table class="bench-table">
         <thead>
           <tr>
@@ -1205,7 +1273,9 @@
         </tbody>
       </table>
 
-      <div class="section-label" style="margin-bottom:12px">The 4-Engine Constellation</div>
+      <div class="section-label-row" style="margin-bottom:12px">
+        <div class="section-label">The 4-Engine Constellation</div>
+      </div>
       <div class="engine-grid">
         <div class="engine-card">
           <div class="engine-num">Engine 01</div>
@@ -1216,7 +1286,6 @@
           <div class="engine-num">Engine 02</div>
           <div class="engine-name">Collision Avoidance</div>
           <div class="engine-desc">CW-physics maneuver optimizer; 4 adaptive burn strategies.</div>
-          <div class="engine-active-badge">Active Engine</div>
         </div>
         <div class="engine-card">
           <div class="engine-num">Engine 03</div>
@@ -1230,7 +1299,9 @@
         </div>
       </div>
 
-      <div class="section-label" style="margin-bottom:12px">Interactive Scenario Presets</div>
+      <div class="section-label-row" style="margin-bottom:12px">
+        <div class="section-label">Interactive Scenario Presets</div>
+      </div>
       <div class="scenario-list">
         <div class="scenario-item" onclick="applyScenario(2.5, 1.24); setView('sim')">
           <div class="scenario-icon">
@@ -1297,7 +1368,7 @@
 </div>
 
 <!-- =========================================================================
-     THREE.JS 3D ENGINE & PRECISION 3D-EXTRUDED EARTH SIMULATION
+     THREE.JS 3D ENGINE & PRECISION SQUARE-PIXEL SIMULATION
      ========================================================================= -->
 <script>
 /* ============================================================
@@ -1310,11 +1381,11 @@ const DEBRIS_SIZE_MIN = 0.20;
 const DEBRIS_SIZE_MAX = 0.42;
 const SAFETY_KM = 5.0;
 
-// Permanent World Center Origin: Earth is locked strictly at (0, 0, 0)
-const WORLD_CENTER = new THREE.Vector3(0, 0, 0);
-
 // Tweaks
 const tweaks = { orbits: true, beacons: true, grid: true, auto: false, milky: true };
+
+// Active Theme: 'dark' | 'light' | 'mono'
+let currentTheme = 'dark';
 
 // Simulation control
 let speedMult = 1.0;
@@ -1322,13 +1393,21 @@ let paused = false;
 let simMET = 0;
 let orbitCount = 1;
 
-// Camera Tracking State
+// Camera mode: 'global' | 'sat' | 'debris-N' | 'intercept'
 let cameraMode = 'global';
-let trackedTarget = null;
 let isFlyingTo = false;
 
 // Illumination mode: 'full' (Full Lit) vs 'shade' (Day/Night)
 let illuminationMode = 'full';
+
+// Physical Collision Intercept State
+let interceptState = {
+  active: false,
+  debris: null,
+  startPos: new THREE.Vector3(),
+  progress: 0,
+  duration: 3.2
+};
 
 // Mission Score
 let dodgedCount = 0;
@@ -1344,13 +1423,13 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// Space canvas background is ALWAYS deep cosmic black
+// Space canvas background is ALWAYS deep cosmic black in all 3 themes
 renderer.setClearColor(0x040508, 1);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x040508);
 
-const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 3000);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2500);
 camera.position.set(0, 48, 150);
 
 const controls = new THREE.OrbitControls(camera, canvas);
@@ -1358,29 +1437,29 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 0.8;
 controls.maxDistance = 260.0;
-// Disable accidental panning so Earth is ALWAYS pinned at center
+// Disable accidental panning so Earth is ALWAYS pinned strictly at origin (0,0,0)
 controls.enablePan = false;
-controls.target.copy(WORLD_CENTER);
 
 /* ============================================================
-   PRE-ALLOCATED SCRATCH VECTORS (Zero GC)
+   PRE-ALLOCATED SCRATCH VECTORS (Zero Garbage Collection)
    ============================================================ */
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _vRay = new THREE.Vector3();
+const _scratchCam = new THREE.Vector3();
 
 /* ============================================================
    LIGHTING ENGINE (DAYLIGHT / FULL LIT TOGGLE)
    ============================================================ */
-// Default to Full Lit (Even Global Illumination from all 360° angles)
 const ambientLight = new THREE.AmbientLight(0xFFFFFF, 2.2);
 scene.add(ambientLight);
 
-const sunLight = new THREE.DirectionalLight(0xFFF6E8, 0.45);
+const sunLight = new THREE.DirectionalLight(0xFFF6E8, 0.35);
 sunLight.position.set(220, 90, 110);
 sunLight.castShadow = true;
 scene.add(sunLight);
 
-const rimLight = new THREE.DirectionalLight(0x38BDF8, 0.35);
+const rimLight = new THREE.DirectionalLight(0x3B82F6, 0.25);
 rimLight.position.set(-160, 60, -90);
 scene.add(rimLight);
 
@@ -1391,8 +1470,8 @@ function setIllumination(mode) {
 
   if (mode === 'full') {
     ambientLight.intensity = 2.2;
-    sunLight.intensity = 0.45;
-    rimLight.intensity = 0.35;
+    sunLight.intensity = 0.35;
+    rimLight.intensity = 0.25;
     btn.classList.add('active');
     txt.textContent = 'Full Lit';
   } else {
@@ -1409,303 +1488,299 @@ function toggleIllumination() {
 }
 
 /* ============================================================
-   5. HIGH-VISIBILITY DEEP SPACE STARFIELD & MILKY WAY
+   BEACON TEXTURES: SOLID FILLED CIRCLE vs HOLLOW OUTLINE RING
    ============================================================ */
-let milkyWayMesh;
-(function buildHighVisibilityStars() {
-  // 1. Crisp Background Stars (2,500 points): sizeAttenuation: false
-  const starGeo = new THREE.BufferGeometry();
-  const starPos = new Float32Array(2500 * 3);
-  const starCols = new Float32Array(2500 * 3);
-  const cWhite = new THREE.Color('#FFFFFF');
-  const cIce = new THREE.Color('#BAE6FD');
-  const cGold = new THREE.Color('#FDE68A');
+function createBeaconTextures() {
+  // 1. Solid filled circle texture
+  const c1 = document.createElement('canvas');
+  c1.width = 64; c1.height = 64;
+  const ctx1 = c1.getContext('2d');
+  ctx1.fillStyle = '#FFFFFF';
+  ctx1.beginPath();
+  ctx1.arc(32, 32, 28, 0, Math.PI * 2);
+  ctx1.fill();
+  const solidTex = new THREE.CanvasTexture(c1);
 
-  for (let i = 0; i < 2500; i++) {
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    const r = 650 + Math.random() * 250;
-    starPos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-    starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-    starPos[i * 3 + 2] = r * Math.cos(phi);
+  // 2. Hollow outline ring texture (Transparent center, crisp ring border)
+  const c2 = document.createElement('canvas');
+  c2.width = 64; c2.height = 64;
+  const ctx2 = c2.getContext('2d');
+  ctx2.clearRect(0, 0, 64, 64);
+  ctx2.strokeStyle = '#FFFFFF';
+  ctx2.lineWidth = 7;
+  ctx2.beginPath();
+  ctx2.arc(32, 32, 25, 0, Math.PI * 2);
+  ctx2.stroke();
+  const hollowTex = new THREE.CanvasTexture(c2);
 
-    const p = Math.random();
-    const col = p < 0.6 ? cWhite : (p < 0.85 ? cIce : cGold);
-    starCols[i * 3]     = col.r;
-    starCols[i * 3 + 1] = col.g;
-    starCols[i * 3 + 2] = col.b;
-  }
-  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  starGeo.setAttribute('color', new THREE.BufferAttribute(starCols, 3));
-  const starMat = new THREE.PointsMaterial({
-    size: 2.0,
-    sizeAttenuation: false, // Guaranteed screen pixels!
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.85,
-  });
-  scene.add(new THREE.Points(starGeo, starMat));
+  return { solidTex, hollowTex };
+}
 
-  // 2. Bright Navigation Stars (300 points)
-  const navGeo = new THREE.BufferGeometry();
-  const navPos = new Float32Array(300 * 3);
-  for (let i = 0; i < 300; i++) {
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    const r = 600 + Math.random() * 200;
-    navPos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-    navPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-    navPos[i * 3 + 2] = r * Math.cos(phi);
-  }
-  navGeo.setAttribute('position', new THREE.BufferAttribute(navPos, 3));
-  const navMat = new THREE.PointsMaterial({
-    size: 3.5,
-    sizeAttenuation: false,
-    color: 0xFFFFFF,
-    transparent: true,
-    opacity: 0.95,
-  });
-  scene.add(new THREE.Points(navGeo, navMat));
+const { solidTex: beaconSolidTex, hollowTex: beaconHollowTex } = createBeaconTextures();
 
-  // 3. Inclined Milky Way Galactic Band (5,000 points tilted at 58°)
-  const mwGeo = new THREE.BufferGeometry();
-  const mwPos = new Float32Array(5000 * 3);
-  const mwCols = new Float32Array(5000 * 3);
-  const cSlate = new THREE.Color('#38BDF8');
-  const cViolet = new THREE.Color('#818CF8');
-  const cDust = new THREE.Color('#E2E8F0');
+/* ============================================================
+   RAY-SPHERE FAR-SIDE OCCLUSION DETECTION
+   ============================================================ */
+function isBehindEarth(camPos, objPos) {
+  _vRay.copy(objPos).sub(camPos);
+  const dist = _vRay.length();
+  if (dist < 0.001) return false;
+  _vRay.divideScalar(dist);
 
-  for (let i = 0; i < 5000; i++) {
+  const t = -camPos.dot(_vRay);
+  if (t <= 0 || t >= dist) return false;
+
+  const closestSq = camPos.lengthSq() - t * t;
+  return closestSq > 0 && Math.sqrt(closestSq) < (R_EARTH * 0.995);
+}
+
+/* ============================================================
+   RICH & VIBRANT MILKY WAY GALAXY BAND (9,000+ PARTICLES)
+   ============================================================ */
+let milkyWayMesh, nebulaClustersMesh;
+(function buildVibrantMilkyWay() {
+  const mwCount = 9500;
+  const positions = new Float32Array(mwCount * 3);
+  const colors = new Float32Array(mwCount * 3);
+
+  // Rich Cosmic Color Palette
+  const cCoreGold   = new THREE.Color(0xF59E0B);
+  const cCoreRose   = new THREE.Color(0xEC4899);
+  const cCream      = new THREE.Color(0xFEF3C7);
+  const cArmCyan    = new THREE.Color(0x06B6D4);
+  const cArmViolet  = new THREE.Color(0x8B5CF6);
+  const cArmIndigo  = new THREE.Color(0x6366F1);
+  const cArmIce     = new THREE.Color(0x38BDF8);
+
+  const tempCol = new THREE.Color();
+
+  for (let i = 0; i < mwCount; i++) {
+    // Angle along the sweeping diagonal band across sky
     const a = (Math.random() - 0.5) * Math.PI * 2;
-    const spread = (Math.random() - 0.5) * (Math.random() - 0.5) * 0.45;
-    const r = 700 + Math.random() * 180;
+    const distFromCore = Math.abs(a) / Math.PI;
 
-    const rawX = r * Math.cos(a);
-    const rawY = r * Math.sin(a) * 0.18 + spread * r;
-    const rawZ = r * Math.sin(a) * Math.cos(spread);
+    // Tighter spread near core, expanding slightly in outer arms
+    const spreadWidth = 0.10 + distFromCore * 0.16;
+    const spread = (Math.random() - 0.5) * spreadWidth;
+    const r = 780 + Math.random() * 80;
 
-    // Rotate by 58° around X-axis
-    const tilt = 58 * Math.PI / 180;
-    mwPos[i * 3]     = rawX;
-    mwPos[i * 3 + 1] = rawY * Math.cos(tilt) - rawZ * Math.sin(tilt);
-    mwPos[i * 3 + 2] = rawY * Math.sin(tilt) + rawZ * Math.cos(tilt);
+    positions[i * 3]     = r * Math.cos(a);
+    positions[i * 3 + 1] = r * Math.sin(a) * 0.45 + spread * r;
+    positions[i * 3 + 2] = r * Math.sin(a) * 0.88 + (Math.random() - 0.5) * 60;
 
-    const p = Math.random();
-    const col = p < 0.45 ? cSlate : (p < 0.75 ? cViolet : cDust);
-    mwCols[i * 3]     = col.r;
-    mwCols[i * 3 + 1] = col.g;
-    mwCols[i * 3 + 2] = col.b;
+    // Color distribution: warm amber/rose near galactic core, electric cyan/violet/indigo in arms
+    if (distFromCore < 0.3) {
+      const p = Math.random();
+      if (p < 0.45) tempCol.copy(cCoreGold);
+      else if (p < 0.8) tempCol.copy(cCoreRose);
+      else tempCol.copy(cCream);
+    } else {
+      const p = Math.random();
+      if (p < 0.35) tempCol.copy(cArmCyan);
+      else if (p < 0.65) tempCol.copy(cArmViolet);
+      else if (p < 0.85) tempCol.copy(cArmIndigo);
+      else tempCol.copy(cArmIce);
+    }
+
+    // Vary brightness
+    const lum = 0.65 + Math.random() * 0.35;
+    colors[i * 3]     = tempCol.r * lum;
+    colors[i * 3 + 1] = tempCol.g * lum;
+    colors[i * 3 + 2] = tempCol.b * lum;
   }
-  mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPos, 3));
-  mwGeo.setAttribute('color', new THREE.BufferAttribute(mwCols, 3));
+
+  const mwGeo = new THREE.BufferGeometry();
+  mwGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  mwGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
   const mwMat = new THREE.PointsMaterial({
-    size: 2.8,
-    sizeAttenuation: false,
+    size: 3.2,
     vertexColors: true,
     transparent: true,
-    opacity: 0.32,
+    opacity: 0.90,
+    sizeAttenuation: false
   });
   milkyWayMesh = new THREE.Points(mwGeo, mwMat);
+  milkyWayMesh.rotation.z = 0.52;
+  milkyWayMesh.rotation.x = 0.28;
   scene.add(milkyWayMesh);
+
+  // Soft low-opacity volumetric nebula clusters along the galactic spine
+  const nebCount = 450;
+  const nebPos = new Float32Array(nebCount * 3);
+  const nebCols = new Float32Array(nebCount * 3);
+
+  for (let i = 0; i < nebCount; i++) {
+    const a = (Math.random() - 0.5) * Math.PI * 2;
+    const r = 770 + Math.random() * 50;
+    nebPos[i * 3]     = r * Math.cos(a);
+    nebPos[i * 3 + 1] = r * Math.sin(a) * 0.45 + (Math.random() - 0.5) * 80;
+    nebPos[i * 3 + 2] = r * Math.sin(a) * 0.88 + (Math.random() - 0.5) * 80;
+
+    const col = (Math.abs(a) < 0.8) ? cCoreRose : cArmViolet;
+    nebCols[i * 3]     = col.r * 0.8;
+    nebCols[i * 3 + 1] = col.g * 0.8;
+    nebCols[i * 3 + 2] = col.b * 0.8;
+  }
+  const nebGeo = new THREE.BufferGeometry();
+  nebGeo.setAttribute('position', new THREE.BufferAttribute(nebPos, 3));
+  nebGeo.setAttribute('color', new THREE.BufferAttribute(nebCols, 3));
+  const nebMat = new THREE.PointsMaterial({
+    size: 14.0,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.12,
+    sizeAttenuation: false
+  });
+  nebulaClustersMesh = new THREE.Points(nebGeo, nebMat);
+  nebulaClustersMesh.rotation.copy(milkyWayMesh.rotation);
+  scene.add(nebulaClustersMesh);
 })();
 
 /* ============================================================
-   1. TRUE 3D SMALL-TRIANGLE FACETED EARTH WITH EXTRUDED CONTINENTS
+   TRUE SQUARE-PIXEL EARTH (SMOOTH SPHERE + 360x180 NEAREST)
    ============================================================ */
 const earthGroup = new THREE.Group();
-earthGroup.position.copy(WORLD_CENTER);
+// Earth MUST never move in space — pinned strictly at world origin
+earthGroup.position.set(0, 0, 0);
 scene.add(earthGroup);
 
-function isLandBiome(lat, lon) {
-  // Antarctica
-  if (lat < -65) return { type: 'ice', color: '#F1F5F9' };
-  // Arctic sea ice & Greenland
-  if (lat >= 60 && lat <= 84 && lon >= -73 && lon <= -12) return { type: 'ice', color: '#F1F5F9' };
-  if (lat > 78) return { type: 'ice', color: '#F1F5F9' };
+function createSquarePixelEarthTexture() {
+  const w = 360, h = 180;
+  const cvs = document.createElement('canvas');
+  cvs.width = w; cvs.height = h;
+  const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
 
-  // South Atlantic & Indian Ocean cutouts
-  if (lat < 0 && lon >= -30 && lon <= 12) return null; // South Atlantic
-  if (lat < 6 && lon >= 42 && lon <= 96) return null;  // Indian Ocean south of India
-  if (lat < 12 && lon >= 80 && lon <= 95) return null; // Bay of Bengal south
+  function getPixelCategory(lon, lat) {
+    if (lat < -62) return 'ice';
+    if (60 <= lat <= 83 && -72 <= lon <= -12) return lat > 72 ? 'ice' : 'land';
+    if (lat >= 80) return 'ice';
 
-  // Pacific Ocean cutouts
-  if (lon > 145 && lat < 55) return null;
-  if (lon < -130 && lat < 45) return null;
-
-  // India & Indian Subcontinent (Prominent peninsula at 8°N–35°N, 68°E–92°E)
-  if (lat >= 8 && lat <= 35 && lon >= 68 && lon <= 92) {
-    if (lat < 22) {
-      const minLon = 72 + (22 - lat) * 0.55;
-      const maxLon = 86 - (22 - lat) * 0.65;
-      if (lon >= minLon && lon <= maxLon) return { type: 'land', color: '#2D6A4F' };
-      return null;
+    // North America
+    if (10 <= lat < 72 && -168 <= lon <= -52) {
+      if (18 <= lat <= 30 && -98 <= lon <= -82) return 'ocean';
+      if (10 <= lat <= 20 && -82 <= lon <= -60) return 'shallow';
+      if (51 <= lat <= 64 && -95 <= lon <= -78) return 'ocean';
+      return 'land';
     }
-    return { type: 'land', color: lat > 28 ? '#40916C' : '#2D6A4F' };
-  }
 
-  // North America
-  if (lat >= 10 && lat <= 72 && lon >= -168 && lon <= -52) {
-    if (lat >= 18 && lat <= 30 && lon >= -98 && lon <= -82) return null; // Gulf of Mexico
-    if (lat >= 52 && lat <= 64 && lon >= -94 && lon <= -78) return null; // Hudson Bay
-    if (lat >= 28 && lat <= 40 && lon >= -118 && lon <= -102) return { type: 'desert', color: '#B69563' };
-    return { type: 'land', color: lat > 50 ? '#40916C' : '#2D6A4F' };
-  }
-
-  // South America
-  if (lat >= -56 && lat < 12 && lon >= -82 && lon <= -34) {
-    if (lat < -20 && lon > -45 - (lat + 20) * 0.6) return null;
-    if (lat < -10 && lon < -80 + (lat + 10) * 0.4) return null;
-    if (lat < -35 && lon < -65) return { type: 'land', color: '#40916C' };
-    return { type: 'land', color: '#2D6A4F' };
-  }
-
-  // Africa
-  if (lat >= -35 && lat <= 37 && lon >= -18 && lon <= 52) {
-    if (lat >= 12 && lat <= 28 && lon >= 33 && lon <= 43) return null; // Red Sea
-    if (lat < 5 && lon > 42 + (lat - 5) * 0.4) return null;
-    if (lat >= 16 && lat <= 32 && lon >= -14 && lon <= 35) return { type: 'desert', color: '#B69563' }; // Sahara
-    return { type: 'land', color: '#2D6A4F' };
-  }
-
-  // Europe
-  if (lat >= 36 && lat <= 71 && lon >= -10 && lon <= 42) {
-    if (lat >= 32 && lat <= 41 && lon >= -5 && lon <= 25) return null; // Mediterranean
-    if (lat >= 41 && lat <= 47 && lon >= 28 && lon <= 42) return null; // Black Sea
-    if (lat >= 54 && lat <= 65 && lon >= 16 && lon <= 26) return null; // Baltic
-    return { type: 'land', color: lat > 58 ? '#40916C' : '#2D6A4F' };
-  }
-
-  // Asia / Middle East / Siberia / East Asia / SE Asia
-  if (lat >= 5 && lat <= 76 && lon >= 40 && lon <= 145) {
-    if (lat >= 12 && lat <= 32 && lon >= 35 && lon <= 60) {
-      if (lat >= 15 && lat <= 28 && lon >= 38 && lon <= 55) return { type: 'desert', color: '#B69563' };
-      return { type: 'land', color: '#40916C' };
+    // South America
+    if (-56 <= lat < 12 && -82 <= lon <= -34) {
+      if (lat < -20 && lon > -45 - (lat + 20) * 0.6) return 'ocean';
+      if (lat < -10 && lon < -80 + (lat + 10) * 0.4) return 'ocean';
+      return 'land';
     }
-    if (lat >= 36 && lat <= 47 && lon >= 47 && lon <= 54) return null; // Caspian
-    if (lat >= 36 && lat <= 46 && lon >= 80 && lon <= 110) return { type: 'desert', color: '#B69563' }; // Gobi
-    if (lat >= 10 && lat <= 22 && lon >= 82 && lon <= 94) return null; // Bay of Bengal
-    if (lat >= 5 && lat <= 20 && lon >= 105 && lon <= 120) return null; // South China Sea
-    if (lat >= 30 && lat <= 46 && lon >= 128 && lon <= 145) {
-      if (Math.abs(lon - (130 + (lat - 30) * 0.8)) < 3.5) return { type: 'land', color: '#2D6A4F' };
+
+    // Africa
+    if (-35 <= lat <= 37 && -18 <= lon <= 52) {
+      if (12 <= lat <= 28 && 33 <= lon <= 43) return 'ocean';
+      if (lat < 5 && lon > 42 + (lat - 5) * 0.4) return 'ocean';
+      if (-5 <= lat <= 5 && 5 <= lon <= 15) return 'shallow';
+      if (lat < -10 && lon < 12 - (lat + 10) * 0.3) return 'ocean';
+      if (18 <= lat <= 32 && -14 <= lon <= 35) return 'desert';
+      return 'land';
     }
-    return { type: 'land', color: lat > 55 ? '#40916C' : '#2D6A4F' };
+
+    // Europe
+    if (36 <= lat <= 71 && -10 <= lon <= 40) {
+      if (32 <= lat <= 42 && -5 <= lon <= 25) return 'ocean';
+      if (54 <= lat <= 65 && 15 <= lon <= 26) return 'shallow';
+      if (41 <= lat <= 47 && 28 <= lon <= 42) return 'ocean';
+      return 'land';
+    }
+
+    // Asia & Middle East
+    if (5 <= lat <= 75 && 40 <= lon <= 180) {
+      if (12 <= lat <= 32 && 35 <= lon <= 60) return (15 <= lat <= 28 && 38 <= lon <= 55) ? 'desert' : 'land';
+      if (24 <= lat <= 30 && 48 <= lon <= 56) return 'shallow';
+      if (36 <= lat <= 47 && 47 <= lon <= 54) return 'ocean';
+      if (8 <= lat <= 34 && 68 <= lon <= 90) {
+        if (lat < 22 && (lon < 72 + (22 - lat)*0.6 || lon > 86 - (22 - lat)*0.7)) return 'ocean';
+        return 'land';
+      }
+      if (10 <= lat <= 22 && 82 <= lon <= 94) return 'ocean';
+      if (5 <= lat <= 20 && 105 <= lon <= 120) return 'shallow';
+      if (38 <= lat <= 46 && 85 <= lon <= 110) return 'desert';
+      return 'land';
+    }
+
+    // Australia
+    if (-44 <= lat <= -10 && 112 <= lon <= 154) {
+      if (-44 <= lat <= -33 && 120 <= lon <= 138) return 'shallow';
+      if (-30 <= lat <= -18 && 120 <= lon <= 142) return 'desert';
+      return 'land';
+    }
+
+    // Indonesia & Japan
+    if (-10 <= lat <= 15 && 95 <= lon <= 140) {
+      if ((lon + lat) % 4 === 0) return 'land';
+    }
+    if (30 <= lat <= 50 && 128 <= lon <= 146) {
+      if (Math.abs(lon - (130 + (lat - 30)*0.8)) < 3) return 'land';
+    }
+
+    if (lat > 72 || lat < -58) return 'shallow';
+    return 'ocean';
   }
 
-  // Australia & New Zealand
-  if (lat >= -44 && lat <= -10 && lon >= 112 && lon <= 154) {
-    if (lat >= -44 && lat <= -33 && lon >= 122 && lon <= 138) return null;
-    if (lat >= -28 && lat <= -18 && lon >= 120 && lon <= 142) return { type: 'desert', color: '#B69563' }; // Outback
-    return { type: 'land', color: '#2D6A4F' };
-  }
-  if (lat >= -47 && lat <= -34 && lon >= 165 && lon <= 179) {
-    return { type: 'land', color: '#40916C' };
+  const colors = {
+    ocean:   ['#0D3B66', '#114B82'],
+    shallow: ['#1A659E', '#145385'],
+    land:    ['#2D6A4F', '#40916C'],
+    desert:  ['#C9A66B', '#B08968'],
+    ice:     ['#F1F5F9', '#FFFFFF']
+  };
+
+  for (let y = 0; y < h; y++) {
+    const lat = 90 - y;
+    for (let x = 0; x < w; x++) {
+      const lon = x - 180;
+      const cat = getPixelCategory(lon, lat);
+      const palette = colors[cat];
+      const col = palette[(x + y) % palette.length];
+      ctx.fillStyle = col;
+      ctx.fillRect(x, y, 1, 1);
+    }
   }
 
-  return null;
+  // Highlight ISRO ISTRAC Bengaluru Ground Station (12.97°N, 77.59°E)
+  const bx = Math.round(77.59 + 180);
+  const by = Math.round(90 - 12.97);
+  ctx.fillStyle = '#FF4F00';
+  ctx.fillRect(bx - 1, by - 1, 2, 2);
+
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  return tex;
 }
 
-// Generate the high-density small-triangle Earth with extruded continents
-function buildExtrudedTriangleEarth() {
-  // Detail = 5 produces 20,480 crisp micro-triangular facets
-  const baseGeo = new THREE.IcosahedronGeometry(R_EARTH, 5).toNonIndexed();
-  const pos = baseGeo.getAttribute('position');
-  const count = pos.count;
-  const colors = new Float32Array(count * 3);
-
-  const cForest   = new THREE.Color('#2D6A4F');
-  const cHighland = new THREE.Color('#40916C');
-  const cDesert   = new THREE.Color('#B69563');
-  const cIce      = new THREE.Color('#F1F5F9');
-  const cOcean1   = new THREE.Color('#0F3558');
-  const cOcean2   = new THREE.Color('#133E68');
-
-  const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
-  const centroid = new THREE.Vector3();
-
-  for (let i = 0; i < count; i += 3) {
-    vA.fromBufferAttribute(pos, i);
-    vB.fromBufferAttribute(pos, i + 1);
-    vC.fromBufferAttribute(pos, i + 2);
-
-    centroid.copy(vA).add(vB).add(vC).divideScalar(3);
-    const len = centroid.length();
-    const lat = Math.asin(Math.min(Math.max(centroid.y / len, -1), 1)) * 180 / Math.PI;
-    const lon = Math.atan2(centroid.z, centroid.x) * 180 / Math.PI;
-
-    const biome = isLandBiome(lat, lon);
-
-    if (biome) {
-      // Land: physically extrude outward by +0.42 units (real 3D elevation!)
-      const rLand = R_EARTH + 0.42;
-      vA.normalize().multiplyScalar(rLand);
-      vB.normalize().multiplyScalar(rLand);
-      vC.normalize().multiplyScalar(rLand);
-
-      pos.setXYZ(i,     vA.x, vA.y, vA.z);
-      pos.setXYZ(i + 1, vB.x, vB.y, vB.z);
-      pos.setXYZ(i + 2, vC.x, vC.y, vC.z);
-
-      // Subtle ±3% brightness variation
-      const jitter = 1.0 + (Math.random() - 0.5) * 0.06;
-      let baseCol = cForest;
-      if (biome.type === 'ice') baseCol = cIce;
-      else if (biome.type === 'desert') baseCol = cDesert;
-      else if (biome.type === 'highland') baseCol = cHighland;
-
-      const r = Math.min(1, Math.max(0, baseCol.r * jitter));
-      const g = Math.min(1, Math.max(0, baseCol.g * jitter));
-      const b = Math.min(1, Math.max(0, baseCol.b * jitter));
-
-      for (let k = 0; k < 3; k++) {
-        colors[(i + k) * 3]     = r;
-        colors[(i + k) * 3 + 1] = g;
-        colors[(i + k) * 3 + 2] = b;
-      }
-    } else {
-      // Ocean: keep radius at 63.71, contrast under 4% (no noisy grid)
-      const oceanJitter = 1.0 + (Math.random() - 0.5) * 0.035;
-      const baseCol = ((i / 3) % 2 === 0) ? cOcean1 : cOcean2;
-      const r = Math.min(1, Math.max(0, baseCol.r * oceanJitter));
-      const g = Math.min(1, Math.max(0, baseCol.g * oceanJitter));
-      const b = Math.min(1, Math.max(0, baseCol.b * oceanJitter));
-
-      for (let k = 0; k < 3; k++) {
-        colors[(i + k) * 3]     = r;
-        colors[(i + k) * 3 + 1] = g;
-        colors[(i + k) * 3 + 2] = b;
-      }
-    }
-  }
-
-  pos.needsUpdate = true;
-  baseGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  baseGeo.computeVertexNormals();
-
-  const mat = new THREE.MeshPhongMaterial({
-    vertexColors: true,
-    flatShading: true,
-    shininess: 14,
-    specular: new THREE.Color(0x1B3552),
-  });
-  return new THREE.Mesh(baseGeo, mat);
-}
-
-const earthMesh = buildExtrudedTriangleEarth();
+const smoothEarthGeo = new THREE.SphereGeometry(R_EARTH, 128, 128);
+const squarePixelEarthTex = createSquarePixelEarthTexture();
+const smoothEarthMat = new THREE.MeshPhongMaterial({
+  map: squarePixelEarthTex,
+  flatShading: false,
+  shininess: 12,
+  specular: new THREE.Color(0x1B3552),
+});
+const earthMesh = new THREE.Mesh(smoothEarthGeo, smoothEarthMat);
 earthMesh.receiveShadow = true;
 earthGroup.add(earthMesh);
 
-// Crisp Lat/Lon Geodesic Wireframe Overlay
+// Lat/Lon Geodesic Wireframe Overlay
 const gridGeo = new THREE.IcosahedronGeometry(R_EARTH * 1.002, 4);
 const gridMat = new THREE.MeshBasicMaterial({
   color: 0x1E4A75,
   wireframe: true,
   transparent: true,
-  opacity: 0.25,
+  opacity: 0.28,
 });
 const gridMesh = new THREE.Mesh(gridGeo, gridMat);
 earthGroup.add(gridMesh);
 
-// Subtle Atmosphere Horizon Rim
+// Atmosphere Horizon Rim
 const atmGeo = new THREE.SphereGeometry(R_EARTH * 1.026, 64, 64);
 const atmMat = new THREE.MeshPhongMaterial({
   color: 0x38BDF8,
@@ -1716,11 +1791,11 @@ const atmMat = new THREE.MeshPhongMaterial({
 });
 earthGroup.add(new THREE.Mesh(atmGeo, atmMat));
 
-// ISRO ISTRAC Ground Station 3D Marker (Bengaluru at 12.97°N, 77.59°E)
+// ISRO ISTRAC Ground Station Marker
 (function buildISTRACMarker() {
   const lat = 12.97 * Math.PI / 180;
   const lon = 77.59 * Math.PI / 180;
-  const r = (R_EARTH + 0.42) * 1.004; // Sits on top of the extruded Indian landmass
+  const r = R_EARTH * 1.012;
   const x = r * Math.cos(lat) * Math.cos(lon);
   const y = r * Math.sin(lat);
   const z = r * Math.cos(lat) * Math.sin(lon);
@@ -1736,7 +1811,7 @@ earthGroup.add(new THREE.Mesh(atmGeo, atmMat));
 })();
 
 /* ============================================================
-   ORBIT RINGS
+   ORBIT RING HELPERS
    ============================================================ */
 function createOrbitRing(radius, inclDeg, color, opacity=0.35) {
   const pts = [];
@@ -1764,12 +1839,11 @@ orbitRingsGroup.add(satOrbitRing);
 const satGroup = new THREE.Group();
 scene.add(satGroup);
 
-// Main chassis
 const busGeo = new THREE.BoxGeometry(SAT_SIZE, SAT_SIZE * 0.75, SAT_SIZE * 0.9);
 const busMat = new THREE.MeshPhongMaterial({ color: 0xD1D5DB, flatShading: true, shininess: 60 });
 satGroup.add(new THREE.Mesh(busGeo, busMat));
 
-// Dual Solar Wing Arrays
+// Solar Wings
 const wingMat = new THREE.MeshPhongMaterial({ color: 0x1E3A8A, flatShading: true, side: THREE.DoubleSide });
 [-1, 1].forEach(side => {
   const wing = new THREE.Mesh(new THREE.BoxGeometry(SAT_SIZE * 1.6, SAT_SIZE * 0.04, SAT_SIZE * 0.65), wingMat);
@@ -1784,13 +1858,13 @@ const wingMat = new THREE.MeshPhongMaterial({ color: 0x1E3A8A, flatShading: true
   }
 });
 
-// Optical camera cone
+// Optical camera
 const camCone = new THREE.Mesh(new THREE.ConeGeometry(SAT_SIZE * 0.22, SAT_SIZE * 0.42, 8), new THREE.MeshPhongMaterial({ color: 0x64748B, flatShading: true }));
 camCone.rotation.z = -Math.PI / 2;
 camCone.position.set(0, 0, SAT_SIZE * 0.6);
 satGroup.add(camCone);
 
-// Thruster nozzle & animated plume
+// Thruster plume
 const thrusterNozzle = new THREE.Mesh(new THREE.CylinderGeometry(SAT_SIZE * 0.1, SAT_SIZE * 0.15, SAT_SIZE * 0.2, 8), new THREE.MeshPhongMaterial({ color: 0x334155, flatShading: true }));
 thrusterNozzle.position.set(0, 0, -SAT_SIZE * 0.55);
 satGroup.add(thrusterNozzle);
@@ -1805,28 +1879,38 @@ plumeMesh.visible = false;
 satGroup.add(plumeMesh);
 
 /* ============================================================
-   SCREEN-SPACE BEACON DOTS
+   SCREEN-SPACE BEACON MARKERS (SOLID vs HOLLOW SPRITES)
    ============================================================ */
-function makeBeaconSphere(colorHex) {
-  const geo = new THREE.SphereGeometry(0.65, 8, 8);
-  const mat = new THREE.MeshBasicMaterial({ color: colorHex, depthTest: false });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.renderOrder = 999;
-  mesh.userData.isBeacon = true;
-  return mesh;
+function makeBeaconSprite(colorHex) {
+  const mat = new THREE.SpriteMaterial({
+    map: beaconSolidTex,
+    color: colorHex,
+    depthTest: false,
+    transparent: true,
+    opacity: 1.0
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.renderOrder = 999;
+  sprite.userData.isBeacon = true;
+  sprite.scale.set(1.4, 1.4, 1.4);
+  return sprite;
 }
 
-const satBeacon = makeBeaconSphere(0x3B82F6);
+const satBeacon = makeBeaconSprite(0x3B82F6);
 scene.add(satBeacon);
 
 /* ============================================================
-   MULTI-DEBRIS SWARM ARCHITECTURE (7 DEBRIS OBJECTS)
+   DYNAMIC MULTI-DEBRIS SWARM (5 TO 30 OBJECTS)
    ============================================================ */
-const SWARM_NAMES = [
-  'COSMOS-1408 Frag', 'FENGYUN-1C Deb', 'IRIDIUM-33 Rem',
-  'SL-16 R/B Frag', 'DELTA-1 Tank', 'VANGUARD Deb', 'BREEZE-M Frag'
+const DEBRIS_CATALOG_NAMES = [
+  'COSMOS-1408 Frag', 'FENGYUN-1C Deb', 'IRIDIUM-33 Rem', 'SL-16 R/B Frag',
+  'DELTA-1 Tank', 'VANGUARD Deb', 'BREEZE-M Frag', 'CZ-3B Third Stage',
+  'TITAN-3C Debris', 'ARIANE-4 Payload Frag', 'THOR-AGENA Rem', 'ATLAS-CENTAUR Deb',
+  'PEGASUS HAPS Frag', 'H-2A R/B Deb', 'MOLNIYA-1 Debris', 'GLOBALSTAR Frag',
+  'ORBCOMM FM Deb', 'SCOUT-X Debris', 'NOAA-16 Battery Frag', 'DMSP-F13 Rem'
 ];
-const debrisSwarm = [];
+
+let debrisSwarm = [];
 let activeThreatIdx = 0;
 
 function createCraggyDebrisMesh(size) {
@@ -1843,14 +1927,15 @@ function createCraggyDebrisMesh(size) {
   return new THREE.Mesh(geo, mat);
 }
 
-for (let i = 0; i < SWARM_NAMES.length; i++) {
+function spawnDebrisObject(index) {
   const size = DEBRIS_SIZE_MIN + Math.random() * (DEBRIS_SIZE_MAX - DEBRIS_SIZE_MIN);
-  const inclDeg = 25 + Math.random() * 135;
-  const altOffset = (Math.random() - 0.5) * 3.0;
+  const inclDeg = 20 + Math.random() * 145;
+  const altOffset = (Math.random() - 0.5) * 3.5;
   const rOrbit = R_ORBIT + altOffset;
-  const speedRatio = 0.82 + Math.random() * 0.36;
+  const speedRatio = 0.80 + Math.random() * 0.40;
   const startAngle = Math.random() * Math.PI * 2;
-  const missDist = 0.5 + Math.random() * 7.5;
+  const missDist = 0.4 + Math.random() * 7.6;
+  const name = DEBRIS_CATALOG_NAMES[index % DEBRIS_CATALOG_NAMES.length] + (index >= DEBRIS_CATALOG_NAMES.length ? ` #${index+1}` : '');
 
   const mesh = createCraggyDebrisMesh(size);
   mesh.castShadow = true;
@@ -1859,12 +1944,12 @@ for (let i = 0; i < SWARM_NAMES.length; i++) {
   const orbitLine = createOrbitRing(rOrbit, inclDeg, 0x884422, 0.15);
   orbitRingsGroup.add(orbitLine);
 
-  const beacon = makeBeaconSphere(i === 0 ? 0xFF4F00 : 0xDC2626);
+  const beacon = makeBeaconSprite(index === 0 ? 0xFF4F00 : 0xDC2626);
   scene.add(beacon);
 
-  debrisSwarm.push({
-    id: i,
-    name: SWARM_NAMES[i],
+  return {
+    id: index,
+    name,
     mesh,
     beacon,
     orbitLine,
@@ -1874,11 +1959,44 @@ for (let i = 0; i < SWARM_NAMES.length; i++) {
     speedRatio,
     size,
     missDistKm: missDist,
-    isActive: i === 0,
+    isActive: index === 0,
     tumbleX: (Math.random() - 0.5) * 0.035,
     tumbleY: (Math.random() - 0.5) * 0.035,
     tumbleZ: (Math.random() - 0.5) * 0.035,
-  });
+  };
+}
+
+// Initial count = 7
+function initSwarm(count = 7) {
+  for (let i = 0; i < count; i++) {
+    debrisSwarm.push(spawnDebrisObject(i));
+  }
+  updateActiveThreatSelection();
+}
+initSwarm(7);
+
+function adjustSwarmCount(delta) {
+  const currentCount = debrisSwarm.length;
+  const newCount = Math.max(5, Math.min(30, currentCount + delta));
+  if (newCount === currentCount) return;
+
+  if (newCount > currentCount) {
+    for (let i = currentCount; i < newCount; i++) {
+      debrisSwarm.push(spawnDebrisObject(i));
+    }
+  } else {
+    while (debrisSwarm.length > newCount) {
+      const d = debrisSwarm.pop();
+      scene.remove(d.mesh);
+      scene.remove(d.beacon);
+      orbitRingsGroup.remove(d.orbitLine);
+    }
+  }
+
+  document.getElementById('swarm-count-val').textContent = newCount;
+  document.getElementById('swarm-count-badge').textContent = newCount;
+  updateActiveThreatSelection();
+  renderSwarmList(true);
 }
 
 function updateActiveThreatSelection() {
@@ -1889,57 +2007,10 @@ function updateActiveThreatSelection() {
   });
   activeThreatIdx = minIdx;
   debrisSwarm.forEach((d, i) => { d.isActive = (i === minIdx); });
-
-  const active = debrisSwarm[activeThreatIdx];
-  document.getElementById('tb-threat-quick-name').textContent = active.name.split(' ')[0];
-}
-updateActiveThreatSelection();
-
-/* ============================================================
-   3. ZERO-BLINK PERMANENT DOM SWARM QUEUE (STRICT DOM RULE)
-   ============================================================ */
-const swarmListContainer = document.getElementById('swarm-list');
-
-// Build the 7 debris row DOM elements ONCE at boot
-(function initSwarmQueueDOM() {
-  swarmListContainer.innerHTML = '';
-  debrisSwarm.forEach((d) => {
-    const row = document.createElement('div');
-    row.className = d.isActive ? 'swarm-item active-threat' : 'swarm-item';
-    row.dataset.debrisId = String(d.id);
-    row.innerHTML = `
-      <i data-lucide="disc" class="swarm-icon"></i>
-      <span class="swarm-name">${d.name}</span>
-      <span class="swarm-miss"><span class="dist-val">${d.missDistKm.toFixed(2)}</span> km</span>
-    `;
-    swarmListContainer.appendChild(row);
-  });
-
-  // Single persistent event delegation listener — guaranteed 100% click response!
-  swarmListContainer.addEventListener('click', (e) => {
-    const row = e.target.closest('[data-debris-id]');
-    if (!row) return;
-    const targetObj = debrisSwarm.find(d => String(d.id) === row.dataset.debrisId);
-    if (targetObj) flyToObject(targetObj);
-  });
-})();
-
-// Inside animate loop: ONLY update textContent and toggle classes (NEVER innerHTML)
-function updateSwarmQueueDOM() {
-  debrisSwarm.forEach((d) => {
-    const row = swarmListContainer.querySelector(`[data-debris-id="${d.id}"]`);
-    if (row) {
-      const distEl = row.querySelector('.dist-val');
-      if (distEl) distEl.textContent = d.missDistKm.toFixed(2);
-      row.classList.toggle('active-threat', d.isActive);
-      const missEl = row.querySelector('.swarm-miss');
-      if (missEl) missEl.classList.toggle('close', d.missDistKm < SAFETY_KM);
-    }
-  });
 }
 
 /* ============================================================
-   SATELLITE & DEBRIS ORBITAL POSITIONS
+   ORBITAL GEOMETRY & CALCULATIONS
    ============================================================ */
 let satAngle = 0;
 const SAT_INCL = 32 * Math.PI / 180;
@@ -1962,127 +2033,159 @@ function getDebrisPosition(d) {
 }
 
 /* ============================================================
-   4. SPHERICAL ORBIT FLY-TO ANIMATION (NEVER CUT THROUGH EARTH!)
+   GOOGLE EARTH GSAP FLY-TO CAMERA ANIMATIONS
    ============================================================ */
-function flyToObject(targetObj) {
-  if (!targetObj) return;
-
-  trackedTarget = targetObj;
-  cameraMode = targetObj === satGroup ? 'sat' : `debris-${targetObj.id ?? 0}`;
-  updateCameraHUD();
-
-  if (targetObj !== satGroup && targetObj.id !== undefined) {
-    activeThreatIdx = targetObj.id;
-    debrisSwarm.forEach((d, j) => { d.isActive = (j === targetObj.id); });
-  }
-
-  const startDir = camera.position.clone().normalize();
-  const startDist = camera.position.length();
-  const startTarget = controls.target.clone();
-
+function flyToCamera(targetPos, desiredDist = 12, onComplete = null) {
   isFlyingTo = true;
+  _v1.copy(camera.position).sub(targetPos).normalize().multiplyScalar(desiredDist).add(targetPos);
+
   if (window.gsap) {
     gsap.killTweensOf(camera.position);
     gsap.killTweensOf(controls.target);
 
-    const anim = { t: 0 };
-    gsap.to(anim, {
-      t: 1.0,
-      duration: 1.45,
-      ease: "power3.inOut",
-      onUpdate: () => {
-        const t = anim.t;
-        // Live world position of target
-        const targetPos = (targetObj === satGroup) ? getSatPosition(satAngle) : (targetObj.mesh ? targetObj.mesh.position.clone() : targetObj.position.clone());
-        const endDir = targetPos.clone().normalize();
-        const endDist = targetPos.length() + 5.5;
-
-        // Quaternion slerp for true spherical curvature around Earth
-        const qStart = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), startDir);
-        const qEnd = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), endDir);
-        const qCur = qStart.clone().slerp(qEnd, t);
-        const curDir = new THREE.Vector3(0, 1, 0).applyQuaternion(qCur).normalize();
-
-        // Parabolic altitude arc boost (mid-flight radius >= 95.0, well above Earth!)
-        const arcBoost = Math.sin(t * Math.PI) * 35.0;
-        const curDist = THREE.MathUtils.lerp(startDist, endDist, t) + arcBoost;
-
-        camera.position.copy(curDir.multiplyScalar(curDist));
-        controls.target.lerpVectors(startTarget, targetPos, t);
-        controls.update();
-      },
-      onComplete: () => {
-        isFlyingTo = false;
-      }
-    });
-  } else {
-    // Fallback
-    const targetPos = (targetObj === satGroup) ? getSatPosition(satAngle) : (targetObj.mesh ? targetObj.mesh.position.clone() : targetObj.position.clone());
-    controls.target.copy(targetPos);
-    camera.position.copy(targetPos.clone().normalize().multiplyScalar(targetPos.length() + 5.5));
-    controls.update();
-    isFlyingTo = false;
-  }
-}
-
-function flyToGlobal() {
-  trackedTarget = null;
-  cameraMode = 'global';
-  updateCameraHUD();
-
-  const startPos = camera.position.clone();
-  const startTarget = controls.target.clone();
-  const endPos = new THREE.Vector3(0, 48, 150);
-
-  isFlyingTo = true;
-  if (window.gsap) {
-    gsap.killTweensOf(camera.position);
-    gsap.killTweensOf(controls.target);
-
-    const anim = { t: 0 };
-    gsap.to(anim, {
-      t: 1.0,
+    gsap.to(controls.target, {
+      x: targetPos.x,
+      y: targetPos.y,
+      z: targetPos.z,
       duration: 1.25,
+      ease: "power2.out"
+    });
+
+    gsap.to(camera.position, {
+      x: _v1.x,
+      y: _v1.y,
+      z: _v1.z,
+      duration: 1.35,
       ease: "power2.inOut",
-      onUpdate: () => {
-        const t = anim.t;
-        camera.position.lerpVectors(startPos, endPos, t);
-        controls.target.lerpVectors(startTarget, WORLD_CENTER, t);
-        controls.update();
-      },
+      onUpdate: () => controls.update(),
       onComplete: () => {
-        controls.target.copy(WORLD_CENTER);
         isFlyingTo = false;
+        if (onComplete) onComplete();
       }
     });
   } else {
-    camera.position.copy(endPos);
-    controls.target.copy(WORLD_CENTER);
+    controls.target.copy(targetPos);
+    camera.position.copy(_v1);
     controls.update();
     isFlyingTo = false;
+    if (onComplete) onComplete();
   }
 }
 
-function updateCameraHUD() {
+function focusObject(mode, idx) {
+  cameraMode = mode === 'debris' ? `debris-${idx}` : mode;
+
   const btnSat = document.getElementById('btn-focus-sat');
-  const btnThreat = document.getElementById('btn-focus-threat');
   const dockCam = document.getElementById('dock-cam');
   const camLbl = document.getElementById('cam-label');
 
-  btnSat.classList.toggle('active', cameraMode === 'sat');
-  btnThreat.classList.toggle('active', cameraMode.startsWith('debris'));
+  btnSat.classList.toggle('active', mode === 'sat');
 
-  if (cameraMode === 'global') {
+  if (mode === 'global') {
     dockCam.className = 'dock-cam';
     camLbl.textContent = 'Global View';
-  } else if (cameraMode === 'sat') {
+
+    if (window.gsap) {
+      isFlyingTo = true;
+      gsap.killTweensOf(camera.position);
+      gsap.killTweensOf(controls.target);
+
+      gsap.to(controls.target, { x: 0, y: 0, z: 0, duration: 1.1, ease: "power2.out" });
+      gsap.to(camera.position, {
+        x: 0, y: 48, z: 150,
+        duration: 1.3,
+        ease: "power2.inOut",
+        onUpdate: () => controls.update(),
+        onComplete: () => { isFlyingTo = false; }
+      });
+    } else {
+      controls.target.set(0, 0, 0);
+      camera.position.set(0, 48, 150);
+      controls.update();
+    }
+  } else if (mode === 'sat') {
     dockCam.className = 'dock-cam safe';
     camLbl.textContent = 'Tracking CARTOSAT-3';
+    const sPos = getSatPosition(satAngle);
+    flyToCamera(sPos, 12);
   } else {
     dockCam.className = 'dock-cam locked';
-    const targetDebris = debrisSwarm[activeThreatIdx];
+    activeThreatIdx = idx;
+    debrisSwarm.forEach((d, j) => { d.isActive = (j === idx); });
+    const targetDebris = debrisSwarm[idx];
     camLbl.textContent = `Tracking ${targetDebris.name.split(' ')[0]}`;
+
+    const dPos = getDebrisPosition(targetDebris);
+    flyToCamera(dPos, 10);
   }
+}
+
+/* ============================================================
+   TRUE PHYSICAL COLLISION INTERCEPT & IMPACT PHYSICS
+   ============================================================ */
+function triggerCollisionIntercept() {
+  const d = debrisSwarm[activeThreatIdx];
+  if (!d) return;
+
+  // 1. Activate intercept state
+  interceptState.active = true;
+  interceptState.debris = d;
+  interceptState.startPos.copy(d.mesh.position);
+  interceptState.progress = 0;
+  interceptState.duration = 3.2; // 3.2 second visible intercept trajectory
+
+  // 2. Show countdown banner in topbar
+  const banner = document.getElementById('intercept-banner');
+  banner.style.display = 'inline-flex';
+  document.getElementById('intercept-status-text').textContent = 'COLLISION COURSE LOCKED — IMPACT IN T-00:03...';
+
+  // 3. Smoothly center camera to frame both satellite and incoming debris
+  cameraMode = 'intercept';
+  _v1.addVectors(satGroup.position, d.mesh.position).multiplyScalar(0.5);
+  flyToCamera(_v1, 24);
+}
+
+function executePhysicalImpact(impactPoint) {
+  interceptState.active = false;
+  document.getElementById('intercept-banner').style.display = 'none';
+
+  // Screen shake on 3D viewport
+  const wrap = document.getElementById('canvas-wrap');
+  wrap.classList.add('screen-shake');
+  setTimeout(() => wrap.classList.remove('screen-shake'), 450);
+
+  // Sparks particle explosion across viewport
+  const rect = canvas.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  const sparkCol = currentTheme === 'mono' ? '#FFFFFF' : '#FF4F00';
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const sz = 4 + Math.random() * 8;
+    p.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${cx}px; top:${cy}px;
+      background:${sparkCol};
+      --tx:${(Math.random() - 0.5) * 280}px;
+      --ty:${(Math.random() - 0.5) * 280}px;
+      --dur:${0.6 + Math.random() * 0.7}s;
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1300);
+  }
+
+  showToast('CRITICAL IMPACT DETECTED — COLLISION AT 0.15 km', 'danger');
+
+  // Respawn debris in a safe non-intercept orbit after 2 seconds
+  setTimeout(() => {
+    if (interceptState.debris) {
+      interceptState.debris.missDistKm = 0.5 + Math.random() * 7.5;
+      interceptState.debris.angle = satAngle + Math.PI;
+      updateActiveThreatSelection();
+    }
+  }, 2200);
 }
 
 /* ============================================================
@@ -2099,7 +2202,7 @@ canvas.addEventListener('click', (e) => {
   lastClickMs = now;
 
   if (isDblClick) {
-    flyToGlobal();
+    focusObject('global');
     return;
   }
 
@@ -2112,7 +2215,7 @@ canvas.addEventListener('click', (e) => {
   const satHits = raycaster.intersectObjects(satGroup.children, true);
   const satBHit = raycaster.intersectObject(satBeacon);
   if (satHits.length > 0 || satBHit.length > 0) {
-    flyToObject(satGroup);
+    focusObject('sat');
     return;
   }
 
@@ -2122,14 +2225,47 @@ canvas.addEventListener('click', (e) => {
     const dHits = raycaster.intersectObject(d.mesh, true);
     const dBHit = raycaster.intersectObject(d.beacon);
     if (dHits.length > 0 || dBHit.length > 0) {
-      flyToObject(d);
+      focusObject('debris', i);
       return;
     }
   }
 });
 
 /* ============================================================
-   2. SIMULATION ANIMATION LOOP (LOCKED CENTER + AUTO-DETACH ZOOM)
+   CAMERA CHASE & DELTA-TRANSLATION (PRESERVES USER ZOOM)
+   ============================================================ */
+function updateCameraTarget(satPos) {
+  if (isFlyingTo) return;
+
+  if (cameraMode === 'global') {
+    controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+    return;
+  }
+
+  if (cameraMode === 'intercept') {
+    if (interceptState.debris) {
+      _v1.addVectors(satPos, interceptState.debris.mesh.position).multiplyScalar(0.5);
+      controls.target.lerp(_v1, 0.12);
+    }
+    return;
+  }
+
+  let goalPos;
+  if (cameraMode === 'sat') {
+    goalPos = satPos;
+  } else {
+    const idx = parseInt(cameraMode.split('-')[1]);
+    if (debrisSwarm[idx]) goalPos = getDebrisPosition(debrisSwarm[idx]);
+    else { cameraMode = 'global'; return; }
+  }
+
+  _v1.copy(goalPos).sub(controls.target);
+  camera.position.add(_v1.multiplyScalar(0.09));
+  controls.target.lerp(goalPos, 0.09);
+}
+
+/* ============================================================
+   SIMULATION ANIMATION LOOP
    ============================================================ */
 let lastFrameTime = performance.now();
 
@@ -2149,13 +2285,13 @@ function animate() {
     orbitCount++;
   }
 
-  // 1. Earth: Permanent World Center + Calm Realistic Axial Rotation
-  earthGroup.position.copy(WORLD_CENTER);
+  // 1. Earth: Pinned strictly at origin + slow calm axial drift
+  earthGroup.position.set(0, 0, 0);
   if (!paused) {
     earthGroup.rotation.y += 0.00025 * speedMult;
   }
 
-  // 2. Update Satellite Mesh
+  // 2. Satellite Position
   const satPos = getSatPosition(satAngle);
   satGroup.position.copy(satPos);
   _v2.set(
@@ -2166,87 +2302,70 @@ function animate() {
   satGroup.lookAt(_v2.multiplyScalar(R_ORBIT));
   satGroup.rotateX(dt * 0.25);
 
-  // Satellite Beacon Dot (Screen-space fade when zoomed close)
+  // Satellite Beacon: Far-Side Occlusion Check (Solid vs Hollow)
   satBeacon.position.copy(satPos);
   const satCamDist = camera.position.distanceTo(satPos);
-  const satBeaconOpacity = tweaks.beacons ? Math.min(1, Math.max(0, (satCamDist - 2.8) / 5.2)) : 0;
-  satBeacon.scale.setScalar(satCamDist * 0.012);
-  satBeacon.material.opacity = satBeaconOpacity;
-  satBeacon.material.transparent = true;
+  const satBehind = isBehindEarth(camera.position, satPos);
 
-  // Thruster Plume Animation
+  satBeacon.material.map = satBehind ? beaconHollowTex : beaconSolidTex;
+  satBeacon.material.opacity = satBehind ? 0.78 : (tweaks.beacons ? Math.min(1, Math.max(0, (satCamDist - 2.8) / 5.2)) : 0);
+  satBeacon.material.color.setHex(currentTheme === 'mono' ? 0xFFFFFF : 0x3B82F6);
+  satBeacon.scale.setScalar(satCamDist * 0.013);
+
+  // Thruster Plume
   if (plumeMesh.visible) {
     plumeMesh.material.opacity = 0.6 + Math.sin(now * 0.02) * 0.35;
     plumeMesh.scale.setScalar(0.85 + Math.sin(now * 0.025) * 0.2);
   }
 
-  // 3. Update Debris Swarm
+  // 3. Debris Swarm Positions & Far-Side Occlusion
   debrisSwarm.forEach((d) => {
-    if (!paused) {
+    // If this debris is on an active intercept collision course:
+    if (interceptState.active && interceptState.debris === d) {
+      interceptState.progress += (dt / interceptState.duration);
+      const remainingSec = Math.max(0, Math.ceil((1 - interceptState.progress) * interceptState.duration));
+      document.getElementById('intercept-status-text').textContent = `COLLISION COURSE LOCKED — IMPACT IN T-00:0${remainingSec}...`;
+
+      // Live physical trajectory straight toward the satellite's moving position
+      d.mesh.position.lerpVectors(interceptState.startPos, satGroup.position, Math.min(1, interceptState.progress));
+      d.mesh.rotateX(0.04);
+      d.mesh.rotateZ(0.04);
+
+      // Check for physical contact
+      const physicalDist = d.mesh.position.distanceTo(satGroup.position);
+      if (physicalDist < 1.2 || interceptState.progress >= 0.98) {
+        executePhysicalImpact(satGroup.position);
+      }
+    } else if (!paused) {
       d.angle += SAT_BASE_SPEED * d.speedRatio * speedMult;
       if (d.angle > Math.PI * 2) d.angle -= Math.PI * 2;
       d.mesh.rotateX(d.tumbleX * speedMult);
       d.mesh.rotateY(d.tumbleY * speedMult);
       d.mesh.rotateZ(d.tumbleZ * speedMult);
+      const dPos = getDebrisPosition(d);
+      d.mesh.position.copy(dPos);
     }
-    const dPos = getDebrisPosition(d);
-    d.mesh.position.copy(dPos);
 
-    // Debris Beacon Dot
-    d.beacon.position.copy(dPos);
-    const dCamDist = camera.position.distanceTo(dPos);
-    const dBeaconOpacity = tweaks.beacons ? Math.min(1, Math.max(0, (dCamDist - 2.8) / 5.2)) : 0;
-    d.beacon.scale.setScalar(dCamDist * (d.isActive ? 0.014 : 0.009));
-    d.beacon.material.opacity = d.isActive ? dBeaconOpacity : dBeaconOpacity * 0.45;
-    d.beacon.material.transparent = true;
-    d.beacon.material.color.setHex(d.isActive ? 0xFF4F00 : 0xDC2626);
+    // Far-Side Occlusion for each debris beacon
+    const currentDPos = d.mesh.position;
+    d.beacon.position.copy(currentDPos);
+    const dCamDist = camera.position.distanceTo(currentDPos);
+    const dBehind = isBehindEarth(camera.position, currentDPos);
 
-    // Infinite Debris Loop — Recycle when completing orbit
-    if (!paused && d.angle < 0.04 && d.angle > 0) {
-      d.missDistKm = 0.5 + Math.random() * 7.5;
-      d.speedRatio = 0.82 + Math.random() * 0.36;
-      d.inclDeg = 25 + Math.random() * 135;
-      d.rOrbit = R_ORBIT + (Math.random() - 0.5) * 3.0;
-      d.angle = Math.random() * Math.PI * 2;
+    d.beacon.material.map = dBehind ? beaconHollowTex : beaconSolidTex;
+    d.beacon.material.opacity = dBehind ? (d.isActive ? 0.85 : 0.45) : (tweaks.beacons ? Math.min(1, Math.max(0, (dCamDist - 2.8) / 5.2)) : 0);
 
-      const pts = [];
-      const incl = d.inclDeg * Math.PI / 180;
-      for (let j = 0; j <= 140; j++) {
-        const a = (j / 140) * Math.PI * 2;
-        pts.push(new THREE.Vector3(d.rOrbit * Math.cos(a), d.rOrbit * Math.sin(a) * Math.sin(incl), d.rOrbit * Math.sin(a) * Math.cos(incl)));
-      }
-      d.orbitLine.geometry.setFromPoints(pts);
-      updateActiveThreatSelection();
-    }
+    const threatColorHex = currentTheme === 'mono' ? (d.isActive ? 0xFFFFFF : 0x999999) : (d.isActive ? 0xFF4F00 : 0xDC2626);
+    d.beacon.material.color.setHex(threatColorHex);
+    d.beacon.scale.setScalar(dCamDist * (d.isActive ? 0.015 : 0.010));
   });
 
-  // 4. Camera Chase & Auto-Detach Zoom Out Logic
-  if (!isFlyingTo) {
-    if (trackedTarget) {
-      const targetPos = (trackedTarget === satGroup) ? satPos : (trackedTarget.mesh ? trackedTarget.mesh.position : trackedTarget.position);
-      const distToTarget = camera.position.distanceTo(controls.target);
-
-      // Auto-Detach on Zoom-Out: If user zooms out past 45 units, release tracking and re-center Earth!
-      if (distToTarget > 45.0) {
-        trackedTarget = null;
-        cameraMode = 'global';
-        updateCameraHUD();
-        controls.target.lerp(WORLD_CENTER, 0.08);
-      } else {
-        // Delta shift preserves user OrbitControls orientation
-        _v1.copy(targetPos).sub(controls.target);
-        camera.position.add(_v1);
-        controls.target.copy(targetPos);
-      }
-    } else {
-      // Global View: controls.target MUST stay strictly at (0, 0, 0)
-      controls.target.lerp(WORLD_CENTER, 0.1);
-    }
-  }
-
-  // 5. Render Zero-Blink Swarm Queue & Telemetry
-  updateSwarmQueueDOM();
+  // Render Telemetry & Sidebar
+  renderSwarmList();
   renderActiveThreatTelemetry();
+
+  // Camera Tracking & Smooth Zoom
+  updateCameraTarget(satPos);
 
   // Orbit & Grid Visibility
   orbitRingsGroup.visible = tweaks.orbits;
@@ -2254,6 +2373,7 @@ function animate() {
   satBeacon.visible = tweaks.beacons;
   debrisSwarm.forEach(d => { d.beacon.visible = tweaks.beacons; });
   if (milkyWayMesh) milkyWayMesh.visible = tweaks.milky;
+  if (nebulaClustersMesh) nebulaClustersMesh.visible = tweaks.milky;
 
   // Update Clock Dock
   document.getElementById('dock-clock-val').textContent = formatMET(simMET);
@@ -2270,8 +2390,32 @@ function animate() {
 }
 
 /* ============================================================
-   ACTIVE THREAT TELEMETRY
+   SIDEBAR TELEMETRY RENDERING
    ============================================================ */
+let lastListUpdate = 0;
+function renderSwarmList(force = false) {
+  const now = performance.now();
+  if (!force && now - lastListUpdate < 150) return;
+  lastListUpdate = now;
+
+  const container = document.getElementById('swarm-list');
+  let html = '';
+  debrisSwarm.forEach((d, i) => {
+    const isAct = d.isActive;
+    const cls = isAct ? 'swarm-item active-threat' : 'swarm-item';
+    const missCls = d.missDistKm < SAFETY_KM ? 'swarm-miss close' : 'swarm-miss';
+    const iconName = isAct ? 'alert-circle' : 'disc';
+    html += `
+      <div class="${cls}" onclick="focusObject('debris', ${i})">
+        <i data-lucide="${iconName}" class="swarm-icon"></i>
+        <span class="swarm-name">${d.name}</span>
+        <span class="${missCls}">${d.missDistKm.toFixed(2)} km</span>
+      </div>`;
+  });
+  container.innerHTML = html;
+  if (window.lucide) lucide.createIcons();
+}
+
 function renderActiveThreatTelemetry() {
   const active = debrisSwarm[activeThreatIdx];
   if (!active) return;
@@ -2279,7 +2423,7 @@ function renderActiveThreatTelemetry() {
   document.getElementById('threat-name-display').textContent = active.name;
 
   const satPos = getSatPosition(satAngle);
-  const dPos = getDebrisPosition(active);
+  const dPos = active.mesh.position;
   const dist3D = satPos.distanceTo(dPos);
 
   const tcaSec = Math.max(45, dist3D * 110);
@@ -2296,11 +2440,6 @@ function renderActiveThreatTelemetry() {
   const pct = Math.min(98, Math.max(6, (1 - dist3D / (R_ORBIT * 2.8)) * 100));
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('progress-pct').textContent = pct.toFixed(0) + '%';
-
-  const isThreat = active.missDistKm < SAFETY_KM;
-  document.getElementById('tb-threat-pill').style.display = isThreat ? 'flex' : 'none';
-  document.getElementById('tb-safe-pill').style.display = isThreat ? 'none' : 'flex';
-  document.getElementById('tb-threat-text').textContent = active.missDistKm.toFixed(2) + ' km · ' + active.name.split(' ')[0];
 }
 
 /* ============================================================
@@ -2353,23 +2492,29 @@ function setView(v) {
   }
 }
 
-// ESC closes drawer
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') setView('sim');
 });
 
 /* ============================================================
-   DARK & BRIGHT CHROME THEME (CANVAS REMAINS SPACE BLACK)
+   3-WAY THEME ENGINE: DARK | LIGHT | MONO
    ============================================================ */
-function toggleTheme() {
-  const html = document.documentElement;
-  const isLight = html.dataset.theme === 'light';
-  html.dataset.theme = isLight ? 'dark' : 'light';
-  document.getElementById('theme-icon-dark').style.display = isLight ? 'inline-block' : 'none';
-  document.getElementById('theme-icon-light').style.display = isLight ? 'none' : 'inline-block';
-  // Space canvas is always black in both themes
+function setTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.dataset.theme = theme;
+
+  document.querySelectorAll('.theme-seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.theme === theme);
+  });
+
+  // Space canvas is ALWAYS deep cosmic black in all 3 themes
   renderer.setClearColor(0x040508, 1);
   scene.background = new THREE.Color(0x040508);
+
+  // Update orbit line colors if in mono
+  if (satOrbitRing) {
+    satOrbitRing.material.color.setHex(theme === 'mono' ? 0xFFFFFF : 0x3B82F6);
+  }
 }
 
 /* ============================================================
@@ -2384,7 +2529,6 @@ async function runOptimize() {
   const miss_km = parseFloat(document.getElementById('sl-miss').value);
   const active = debrisSwarm[activeThreatIdx];
 
-  // Exact ConjunctionInput schema for src/api.py
   const payload = {
     conjunction_id: 1000 + activeThreatIdx,
     active_sat_norad_id: 44804,
@@ -2509,7 +2653,8 @@ function triggerThrusterDodge(postMiss) {
     ));
   }
   const arcGeo = new THREE.BufferGeometry().setFromPoints(arcPts);
-  const arcMat = new THREE.LineBasicMaterial({ color: 0x10B981, transparent: true, opacity: 0.85 });
+  const arcColor = currentTheme === 'mono' ? 0xFFFFFF : 0x10B981;
+  const arcMat = new THREE.LineBasicMaterial({ color: arcColor, transparent: true, opacity: 0.85 });
   activeDodgeArc = new THREE.Line(arcGeo, arcMat);
   scene.add(activeDodgeArc);
 
@@ -2526,45 +2671,6 @@ function triggerThrusterDodge(postMiss) {
     debrisSwarm[activeThreatIdx].missDistKm = postMiss;
     updateActiveThreatSelection();
   }, 2600);
-}
-
-/* ============================================================
-   CINEMATIC COLLISION SIMULATION & PARTICLE EXPLOSION
-   ============================================================ */
-function simulateImpact() {
-  document.getElementById('sl-miss').value = 0.15;
-  document.getElementById('miss-pre-label').textContent = '0.15 km';
-  debrisSwarm[activeThreatIdx].missDistKm = 0.15;
-  updateActiveThreatSelection();
-
-  // Screen shake
-  const wrap = document.getElementById('canvas-wrap');
-  wrap.classList.add('screen-shake');
-  setTimeout(() => wrap.classList.remove('screen-shake'), 500);
-
-  // Trigger Sparks Particle Burst
-  const rect = canvas.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-
-  for (let i = 0; i < 35; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    const sz = 4 + Math.random() * 8;
-    const col = Math.random() > 0.4 ? '#FF4F00' : '#F59E0B';
-    p.style.cssText = `
-      width:${sz}px; height:${sz}px;
-      left:${cx}px; top:${cy}px;
-      background:${col};
-      --tx:${(Math.random() - 0.5) * 260}px;
-      --ty:${(Math.random() - 0.5) * 260}px;
-      --dur:${0.6 + Math.random() * 0.7}s;
-    `;
-    document.body.appendChild(p);
-    setTimeout(() => p.remove(), 1300);
-  }
-
-  showToast('CRITICAL IMPACT DETECTED — COLLISION AT 0.15 km', 'danger');
 }
 
 /* ============================================================
@@ -2591,8 +2697,11 @@ document.getElementById('sl-miss').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
   document.getElementById('miss-pre-label').textContent = v.toFixed(2) + ' km';
   debrisSwarm[activeThreatIdx].missDistKm = v;
-  if (v < 0.25) simulateImpact();
-  else updateActiveThreatSelection();
+  if (v < 0.20) {
+    triggerCollisionIntercept();
+  } else {
+    updateActiveThreatSelection();
+  }
 });
 
 function applyScenario(tca, miss) {
@@ -2612,7 +2721,10 @@ function toggleTweak(k, btn) {
   tweaks[k] = !tweaks[k];
   btn.classList.toggle('on', tweaks[k]);
   if (k === 'auto') autoOptimize = tweaks[k];
-  if (k === 'milky' && milkyWayMesh) milkyWayMesh.visible = tweaks[k];
+  if (k === 'milky') {
+    if (milkyWayMesh) milkyWayMesh.visible = tweaks[k];
+    if (nebulaClustersMesh) nebulaClustersMesh.visible = tweaks[k];
+  }
 }
 
 /* ============================================================
@@ -2664,16 +2776,9 @@ function formatMET(sec) {
 /* ============================================================
    BOOT ENGINE
    ============================================================ */
-// Set initial illumination to Full Lit
 setIllumination('full');
-
-// Start animation loop
 animate();
-
-// Initialize Lucide Icons
-if (window.lucide) {
-  lucide.createIcons();
-}
+if (window.lucide) lucide.createIcons();
 </script>
 </body>
 </html>
