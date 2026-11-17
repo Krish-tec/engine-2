@@ -4,65 +4,77 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QuantumOrbit · Engine 2 — Autonomous Collision Avoidance</title>
+  
+  <!-- Google Fonts: Space Grotesk & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Three.js & OrbitControls -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <!-- GSAP for Smooth Google Earth Fly-To Transitions -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
     /* =========================================================================
-       1. MONOCHROME SWISS-MINIMAL DESIGN SYSTEM + THEME TOKENS
+       1. BORDERLESS MINIMAL SWISS DESIGN SYSTEM + DUAL THEMES
        ========================================================================= */
     :root {
+      /* Dark Theme (Default) */
       --bg:             #09090B;
       --surface:        #111114;
-      --surface-2:      #18181C;
-      --surface-3:      #222228;
-      --surface-hover:  #282830;
-      --border:         rgba(255,255,255,0.07);
-      --border-hard:    #2E2E34;
-      --border-focus:   #4B4B55;
+      --surface-2:      #16161A;
+      --surface-3:      #1E1E24;
+      --surface-hover:  #26262E;
+      --border:         rgba(255, 255, 255, 0.05);
+      --border-hard:    #222228;
+      --border-focus:   #3A3A44;
 
       --text-1:         #F4F4F5;
       --text-2:         #A1A1AA;
       --text-3:         #71717A;
 
-      /* Punchy Single Accent (International Aerospace Orange) */
+      /* International Aerospace Orange Accent */
       --accent:         #FF4F00;
       --accent-hover:   #E04500;
       --accent-dim:     rgba(255, 79, 0, 0.12);
-      --accent-ring:    rgba(255, 79, 0, 0.38);
+      --accent-ring:    rgba(255, 79, 0, 0.35);
 
-      /* Functional Success Accent (Emerald - strictly for verified clearance) */
+      /* Emerald Safe Clearance */
       --safe:           #10B981;
       --safe-dim:       rgba(16, 185, 129, 0.12);
-      --safe-ring:      rgba(16, 185, 129, 0.35);
+      --safe-ring:      rgba(16, 185, 129, 0.32);
 
-      /* Functional Amber Thruster */
       --burn:           #F59E0B;
 
-      /* 3D WebGL Canvas Space Background */
-      --canvas-bg:      #07080C;
+      /* Space Canvas Background is ALWAYS deep cosmic black */
+      --canvas-bg:      #040508;
 
       --r-xs:           4px;
       --r-sm:           6px;
       --r-md:           10px;
       --r-lg:           14px;
-      --shadow:         0 1px 3px rgba(0,0,0,0.5), 0 4px 20px rgba(0,0,0,0.35);
+      --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md:      0 4px 16px rgba(0, 0, 0, 0.35);
       --easing:         cubic-bezier(0.22, 1, 0.36, 1);
       --font-display:   'Space Grotesk', sans-serif;
       --font-mono:      'JetBrains Mono', monospace;
     }
 
     [data-theme="light"] {
+      /* Bright Mode (UI Chrome only — Canvas remains space black) */
       --bg:             #F8FAFC;
       --surface:        #FFFFFF;
       --surface-2:      #F1F5F9;
       --surface-3:      #E2E8F0;
       --surface-hover:  #CBD5E1;
-      --border:         rgba(0,0,0,0.08);
-      --border-hard:    #CBD5E1;
+      --border:         rgba(0, 0, 0, 0.06);
+      --border-hard:    #E2E8F0;
       --border-focus:   #94A3B8;
 
       --text-1:         #09090B;
@@ -72,15 +84,16 @@
       --accent:         #FF4F00;
       --accent-hover:   #E04500;
       --accent-dim:     rgba(255, 79, 0, 0.08);
-      --accent-ring:    rgba(255, 79, 0, 0.30);
+      --accent-ring:    rgba(255, 79, 0, 0.28);
 
       --safe:           #059669;
-      --safe-dim:       rgba(5, 150, 105, 0.09);
-      --safe-ring:      rgba(5, 150, 105, 0.30);
+      --safe-dim:       rgba(5, 150, 105, 0.08);
+      --safe-ring:      rgba(5, 150, 105, 0.28);
 
       --burn:           #D97706;
 
-      --canvas-bg:      #EEF2F6;
+      /* Space remains deep black even in bright theme */
+      --canvas-bg:      #040508;
     }
 
     *, *::before, *::after {
@@ -132,8 +145,9 @@
       border-radius: var(--r-sm);
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
+      color: #fff;
     }
-    .tb-logo-mark svg { width: 16px; height: 16px; fill: #fff; }
+    .tb-logo-mark svg { width: 16px; height: 16px; }
     .tb-wordmark {
       font-size: 13.5px;
       font-weight: 700;
@@ -150,7 +164,39 @@
       font-family: var(--font-mono);
     }
 
-    /* Threat Status Pill in Topbar */
+    /* Quick Camera Focus Shortcuts */
+    .tb-quick-focus {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 16px;
+    }
+    .tb-focus-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--r-sm);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all 140ms ease;
+    }
+    .tb-focus-btn svg { width: 13px; height: 13px; stroke-width: 1.8; }
+    .tb-focus-btn:hover {
+      background: var(--surface-3);
+      color: var(--text-1);
+      border-color: var(--border-hard);
+    }
+    .tb-focus-btn.active {
+      border-color: var(--accent-ring);
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    /* Threat Status Indicator */
     .tb-threat-badge {
       display: flex; align-items: center; gap: 7px;
       margin-left: 16px;
@@ -167,18 +213,8 @@
       cursor: pointer;
       transition: all 180ms ease;
     }
-    .tb-threat-badge:hover {
-      background: rgba(255, 79, 0, 0.2);
-    }
-    .tb-threat-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--accent);
-      animation: pulse-threat 1.4s ease-in-out infinite;
-    }
-    @keyframes pulse-threat {
-      0%,100% { opacity: 1; transform: scale(1); }
-      50%      { opacity: 0.35; transform: scale(0.7); }
-    }
+    .tb-threat-badge svg { width: 13px; height: 13px; }
+    .tb-threat-badge:hover { background: rgba(255, 79, 0, 0.2); }
     .tb-safe-pill {
       display: none;
       align-items: center; gap: 6px;
@@ -195,39 +231,9 @@
       color: var(--safe);
       cursor: pointer;
     }
+    .tb-safe-pill svg { width: 13px; height: 13px; }
 
-    /* Quick Camera Focus Buttons */
-    .tb-quick-focus {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-left: 16px;
-    }
-    .tb-focus-btn {
-      display: flex; align-items: center; gap: 5px;
-      padding: 4px 10px;
-      border-radius: var(--r-sm);
-      font-size: 11px;
-      font-family: var(--font-mono);
-      font-weight: 600;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      color: var(--text-2);
-      cursor: pointer;
-      transition: all 140ms ease;
-    }
-    .tb-focus-btn:hover {
-      background: var(--surface-3);
-      color: var(--text-1);
-      border-color: var(--border-hard);
-    }
-    .tb-focus-btn.active {
-      border-color: var(--accent-ring);
-      background: var(--accent-dim);
-      color: var(--accent);
-    }
-
-    /* Nav Pills */
+    /* Navigation Pills */
     .tb-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
     .tb-pill {
       display: flex; align-items: center; gap: 7px;
@@ -237,18 +243,18 @@
       font-weight: 600;
       color: var(--text-2);
       cursor: pointer;
-      transition: color 150ms, background 150ms;
+      transition: all 150ms ease;
       border: 1px solid transparent;
       background: transparent;
       font-family: var(--font-display);
     }
+    .tb-pill svg { width: 14px; height: 14px; stroke-width: 1.8; }
     .tb-pill:hover { background: var(--surface-2); color: var(--text-1); }
     .tb-pill.active {
       background: var(--accent-dim);
       color: var(--accent);
       border-color: var(--accent-ring);
     }
-    .tb-pill svg { width: 14px; height: 14px; fill: currentColor; }
 
     /* Theme Toggle */
     .tb-actions { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
@@ -260,10 +266,10 @@
       border: 1px solid var(--border-hard);
       cursor: pointer;
       color: var(--text-2);
-      transition: color 150ms, background 150ms, border-color 150ms;
+      transition: all 150ms ease;
     }
+    .tb-icon-btn svg { width: 15px; height: 15px; stroke-width: 1.8; }
     .tb-icon-btn:hover { background: var(--surface-2); color: var(--text-1); border-color: var(--border-focus); }
-    .tb-icon-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
     /* ---- 3D CANVAS WRAPPER ---- */
     #canvas-wrap {
@@ -291,7 +297,7 @@
       width: 100%; height: 100%;
     }
 
-    /* Canvas Overlays */
+    /* Canvas HUD Hint */
     .canvas-hud-hint {
       position: absolute;
       bottom: 14px; left: 50%;
@@ -302,13 +308,12 @@
       pointer-events: none;
       white-space: nowrap;
       letter-spacing: 0.04em;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 4px 12px;
+      background: rgba(0, 0, 0, 0.55);
+      padding: 4px 14px;
       border-radius: 20px;
-      backdrop-filter: blur(4px);
-    }
-    [data-theme="light"] .canvas-hud-hint {
-      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     /* Object Tooltip */
@@ -324,11 +329,11 @@
       font-family: var(--font-mono);
       color: var(--text-1);
       white-space: nowrap;
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow-md);
       z-index: 20;
     }
 
-    /* ---- RIGHT SIDEBAR ---- */
+    /* ---- RIGHT SIDEBAR (BORDERLESS MINIMAL CARDS) ---- */
     #sidebar {
       grid-column: 2;
       grid-row: 2;
@@ -366,14 +371,13 @@
       border-radius: 2px;
     }
 
-    /* Step Cards */
+    /* Borderless Minimal Cards */
     .step-card {
       background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: var(--r-md);
       padding: 12px;
       margin-bottom: 8px;
-      position: relative;
     }
     .step-card:last-child { margin-bottom: 0; }
     .step-num {
@@ -426,9 +430,10 @@
       border-color: var(--accent-ring);
     }
     .swarm-item:last-child { margin-bottom: 0; }
-    .swarm-dot {
-      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    .swarm-icon {
+      width: 14px; height: 14px; flex-shrink: 0; color: var(--text-3);
     }
+    .swarm-item.active-threat .swarm-icon { color: var(--accent); }
     .swarm-name { font-size: 11px; font-weight: 600; font-family: var(--font-mono); color: var(--text-1); flex: 1; }
     .swarm-miss { font-size: 10.5px; font-family: var(--font-mono); color: var(--text-3); }
     .swarm-miss.close { color: var(--accent); font-weight: 700; }
@@ -477,10 +482,10 @@
       display: flex; align-items: center; justify-content: center; gap: 8px;
       margin-top: 10px;
     }
+    .btn-optimize svg { width: 15px; height: 15px; stroke-width: 2.2; }
     .btn-optimize:hover { background: var(--accent-hover); }
     .btn-optimize:active { transform: scale(0.98); }
     .btn-optimize:disabled { background: var(--surface-3); color: var(--text-3); cursor: not-allowed; transform: none; }
-    .btn-optimize svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
     /* Secondary Action (Simulate Impact) */
     .btn-impact {
@@ -496,7 +501,9 @@
       cursor: pointer;
       margin-top: 8px;
       transition: all 150ms ease;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
     }
+    .btn-impact svg { width: 13px; height: 13px; }
     .btn-impact:hover {
       border-color: var(--accent-ring);
       color: var(--accent);
@@ -537,6 +544,7 @@
       color: var(--safe);
       margin-top: 8px;
     }
+    .strategy-badge svg { width: 12px; height: 12px; }
 
     /* Dodged Counter */
     .dodge-counter {
@@ -599,6 +607,31 @@
 
     .dock-sep { width: 1px; height: 24px; background: var(--border-hard); margin: 0 8px; }
 
+    /* Illumination Toggle Button */
+    .dock-light-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px;
+      border-radius: var(--r-sm);
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      color: var(--text-2);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 140ms ease;
+    }
+    .dock-light-btn svg { width: 13px; height: 13px; }
+    .dock-light-btn:hover {
+      background: var(--surface-3);
+      color: var(--text-1);
+      border-color: var(--border-hard);
+    }
+    .dock-light-btn.active {
+      border-color: var(--accent-ring);
+      color: var(--text-1);
+    }
+
     .dock-clock {
       font-family: var(--font-mono);
       font-size: 11px;
@@ -614,17 +647,17 @@
       font-family: var(--font-mono);
       color: var(--text-3);
       cursor: pointer;
-      padding: 4px 8px;
+      padding: 4px 10px;
       border-radius: var(--r-sm);
       transition: background 120ms ease;
     }
+    .dock-cam svg { width: 13px; height: 13px; }
     .dock-cam:hover {
       background: var(--surface-2);
       color: var(--text-1);
     }
-    .dock-cam-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); }
-    .dock-cam-dot.locked { background: var(--accent); animation: pulse-threat 1.4s infinite; }
-    .dock-cam-dot.safe   { background: var(--safe); }
+    .dock-cam.locked { color: var(--accent); }
+    .dock-cam.safe   { color: var(--safe); }
 
     /* ---- GUIDE DRAWER (SLIDING ARCHITECTURE) ---- */
     #guide-drawer {
@@ -646,9 +679,6 @@
       background: rgba(0,0,0,0.65);
       backdrop-filter: blur(5px);
       -webkit-backdrop-filter: blur(5px);
-    }
-    [data-theme="light"] .drawer-backdrop {
-      background: rgba(240,245,250,0.75);
     }
     .drawer-panel {
       position: absolute;
@@ -682,8 +712,8 @@
       background: transparent; cursor: pointer; color: var(--text-2);
       transition: background 150ms;
     }
+    .drawer-close svg { width: 14px; height: 14px; stroke-width: 2.2; }
     .drawer-close:hover { background: var(--surface-2); color: var(--text-1); }
-    .drawer-close svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
     .drawer-body { padding: 24px 24px 40px; flex: 1; }
 
     .drawer-eyebrow {
@@ -791,8 +821,9 @@
       border: 1px solid var(--border-hard);
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
+      color: var(--text-2);
     }
-    .scenario-icon svg { width: 16px; height: 16px; fill: none; stroke: var(--text-2); stroke-width: 1.8; }
+    .scenario-icon svg { width: 16px; height: 16px; stroke-width: 1.8; }
     .scenario-title { font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 2px; }
     .scenario-sub { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
 
@@ -847,7 +878,7 @@
       border: 1px solid var(--border-hard);
       border-radius: var(--r-lg);
       padding: 14px;
-      box-shadow: var(--shadow), 0 8px 40px rgba(0,0,0,0.3);
+      box-shadow: var(--shadow-md), 0 8px 40px rgba(0,0,0,0.3);
       z-index: 90;
       display: none;
       font-family: var(--font-display);
@@ -886,16 +917,15 @@
       color: var(--text-3);
       z-index: 91;
       transition: background 150ms, color 150ms;
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow-sm);
     }
     #tweaks-fab:hover { background: var(--surface-2); color: var(--text-1); }
-    #tweaks-fab svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+    #tweaks-fab svg { width: 16px; height: 16px; stroke-width: 2; }
 
     /* Scrollbars */
     #sidebar::-webkit-scrollbar { width: 4px; }
     #sidebar::-webkit-scrollbar-thumb { background: var(--border-hard); border-radius: 2px; }
 
-    /* Reduced Motion */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
@@ -911,43 +941,43 @@
   <header id="topbar">
     <div class="tb-logo" onclick="focusObject('global')" title="Reset to Global View">
       <div class="tb-logo-mark">
-        <svg viewBox="0 0 16 16"><ellipse cx="8" cy="8" rx="7" ry="3" stroke="#fff" stroke-width="1.6" fill="none"/><ellipse cx="8" cy="8" rx="7" ry="3" stroke="#fff" stroke-width="1.6" fill="none" transform="rotate(90 8 8)"/><circle cx="8" cy="8" r="1.6" fill="#fff"/></svg>
+        <i data-lucide="orbit"></i>
       </div>
       <span class="tb-wordmark">QuantumOrbit</span>
     </div>
     <div class="tb-sep"></div>
     <span class="tb-mission">UC-096 · Engine 2 — CAM</span>
 
-    <!-- Quick Focus Buttons -->
+    <!-- Quick Camera Focus Shortcuts -->
     <div class="tb-quick-focus">
-      <button class="tb-focus-btn" id="btn-focus-sat" onclick="focusObject('sat')" title="Focus Satellite">
-        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3B82F6"></span>
+      <button class="tb-focus-btn" id="btn-focus-sat" onclick="focusObject('sat')" title="Fly to Satellite">
+        <i data-lucide="satellite"></i>
         CARTOSAT-3
       </button>
-      <button class="tb-focus-btn" id="btn-focus-threat" onclick="focusObject('debris', activeThreatIdx)" title="Focus Active Threat">
-        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#FF4F00"></span>
+      <button class="tb-focus-btn" id="btn-focus-threat" onclick="focusObject('debris', activeThreatIdx)" title="Fly to Active Threat">
+        <i data-lucide="crosshair"></i>
         <span id="tb-threat-quick-name">THREAT</span>
       </button>
     </div>
 
     <!-- Live Threat Status Indicator -->
     <div class="tb-threat-badge" id="tb-threat-pill" onclick="focusObject('debris', activeThreatIdx)" title="Click to track threat">
-      <div class="tb-threat-dot"></div>
+      <i data-lucide="shield-alert"></i>
       <span id="tb-threat-text">ACTIVE THREAT</span>
     </div>
     <div class="tb-safe-pill" id="tb-safe-pill" onclick="focusObject('sat')" title="Click to track satellite">
-      <svg width="8" height="8" viewBox="0 0 8 8" fill="var(--safe)"><circle cx="4" cy="4" r="4"/></svg>
+      <i data-lucide="shield-check"></i>
       SAFE CLEARANCE
     </div>
 
     <!-- Navigation Pills -->
     <nav class="tb-nav">
       <button class="tb-pill active" id="nav-sim" onclick="setView('sim')">
-        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" stroke-width="1.5" stroke="currentColor" fill="none"/><path d="M8 8 L11 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M8 8 L7 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+        <i data-lucide="globe"></i>
         Live 3D Simulator
       </button>
       <button class="tb-pill" id="nav-guide" onclick="setView('guide')">
-        <svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="5" y1="5.5" x2="11" y2="5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="5" y1="8" x2="10" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="5" y1="10.5" x2="8.5" y2="10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <i data-lucide="book-open"></i>
         Guide & Architecture
       </button>
     </nav>
@@ -955,8 +985,8 @@
     <!-- Theme Toggle -->
     <div class="tb-actions">
       <button class="tb-icon-btn" id="theme-btn" title="Toggle Dark/Bright Theme" onclick="toggleTheme()">
-        <svg id="theme-icon-dark" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
-        <svg id="theme-icon-light" style="display:none" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4.95 2.05a1 1 0 010 1.414l-.707.707A1 1 0 0112.83 4.76l.707-.707a1 1 0 011.414 0zM10 18a1 1 0 01-1-1v-1a1 1 0 112 0v1a1 1 0 01-1 1zm-7-8a1 1 0 011-1h1a1 1 0 110 2H4a1 1 0 01-1-1zm13 0a1 1 0 011-1h1a1 1 0 110 2h-1a1 1 0 01-1-1zM5.757 5.757a1 1 0 011.414 0l.707.707A1 1 0 016.464 7.878l-.707-.707a1 1 0 010-1.414zM10 7a3 3 0 100 6 3 3 0 000-6z" fill="currentColor"/></svg>
+        <span id="theme-icon-dark"><i data-lucide="moon"></i></span>
+        <span id="theme-icon-light" style="display:none"><i data-lucide="sun"></i></span>
       </button>
     </div>
   </header>
@@ -1015,12 +1045,13 @@
       </div>
 
       <button class="btn-optimize" id="btn-opt" onclick="runOptimize()">
-        <svg viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg>
+        <i data-lucide="zap"></i>
         Compute Optimal CAM
       </button>
 
       <button class="btn-impact" onclick="simulateImpact()" title="Test collision animation and particle explosion">
-        💥 Simulate Impact Scenario (&lt; 0.2 km)
+        <i data-lucide="flame"></i>
+        Simulate Critical Impact (&lt; 0.2 km)
       </button>
     </div>
 
@@ -1051,7 +1082,7 @@
       </div>
       <div id="strategy-display" style="display:none">
         <div class="strategy-badge">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="var(--safe)"><path d="M2 5l2.5 2.5L8 3"/></svg>
+          <i data-lucide="check-circle-2"></i>
           <span id="strategy-text">Hybrid Radial Emergency</span>
         </div>
         <div class="tele-row" style="margin-top:8px"><span class="tele-label">Delta-V Burn</span><span class="tele-value safe" id="res-dv">5.00 m/s</span></div>
@@ -1074,7 +1105,7 @@
   </aside>
 
   <!-- =========================================================================
-       BOTTOM DOCK — SPEED CONTROLS
+       BOTTOM DOCK — SPEED & ILLUMINATION CONTROLS
        ========================================================================= -->
   <footer id="bottom-dock">
     <span class="dock-label">Sim Speed</span>
@@ -1085,11 +1116,19 @@
 
     <div class="dock-sep"></div>
 
+    <!-- Illumination Toggle (Full Lit vs Day-Night Shade) -->
+    <button class="dock-light-btn active" id="btn-light-toggle" onclick="toggleIllumination()" title="Toggle Full Illumination vs Day/Night Shading">
+      <i data-lucide="sun"></i>
+      <span id="light-mode-text">Full Lit</span>
+    </button>
+
+    <div class="dock-sep"></div>
+
     <span class="dock-clock">MET <span id="dock-clock-val">+00:00:00</span></span>
     <span class="dock-clock" style="margin-left:14px">Orbit <span id="dock-orbit-num">1</span></span>
 
     <div class="dock-cam" id="dock-cam" onclick="focusObject('global')">
-      <div class="dock-cam-dot" id="cam-dot"></div>
+      <i data-lucide="compass"></i>
       <span id="cam-label">Global View</span>
     </div>
   </footer>
@@ -1105,7 +1144,7 @@
     <div class="drawer-header">
       <span class="drawer-title">Guide & Constellation Architecture</span>
       <button class="drawer-close" onclick="setView('sim')" title="Close Drawer">
-        <svg viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12"/></svg>
+        <i data-lucide="x"></i>
       </button>
     </div>
     <div class="drawer-body">
@@ -1191,7 +1230,7 @@
       <div class="scenario-list">
         <div class="scenario-item" onclick="applyScenario(2.5, 1.24); setView('sim')">
           <div class="scenario-icon">
-            <svg viewBox="0 0 16 16"><path d="M8 2L8 14M2 8L14 8" stroke-linecap="round"/></svg>
+            <i data-lucide="shuffle"></i>
           </div>
           <div>
             <div class="scenario-title">Standard Conjunction (TCA 2.5 h)</div>
@@ -1200,7 +1239,7 @@
         </div>
         <div class="scenario-item" onclick="applyScenario(0.8, 0.4); setView('sim')">
           <div class="scenario-icon">
-            <svg viewBox="0 0 16 16"><path d="M2 8C2 4.686 4.686 2 8 2s6 2.686 6 6-2.686 6-6 6" stroke-linecap="round"/><path d="M8 8L14 8" stroke-linecap="round"/></svg>
+            <i data-lucide="alert-triangle"></i>
           </div>
           <div>
             <div class="scenario-title">Urgent Emergency Encounter (TCA 0.8 h)</div>
@@ -1209,7 +1248,7 @@
         </div>
         <div class="scenario-item" onclick="applyScenario(7.0, 6.5); setView('sim')">
           <div class="scenario-icon">
-            <svg viewBox="0 0 16 16"><path d="M8 2a6 6 0 100 12A6 6 0 008 2z"/><path d="M8 7v2" stroke-linecap="round"/></svg>
+            <i data-lucide="shield"></i>
           </div>
           <div>
             <div class="scenario-title">Safe Orbit Clearance (TCA 7.0 h)</div>
@@ -1227,7 +1266,7 @@
 
 <!-- Tweaks Floating Panel -->
 <button id="tweaks-fab" title="Open Simulation Tweaks" onclick="document.getElementById('tweaks-panel').classList.toggle('visible')">
-  <svg viewBox="0 0 20 20"><path d="M3 6h2m12 0H9M9 6a2 2 0 110-4 2 2 0 010 4zM3 14h8m6 0h-2m-4 0a2 2 0 110 4 2 2 0 010-4z"/></svg>
+  <i data-lucide="sliders"></i>
 </button>
 <div id="tweaks-panel">
   <div class="tweaks-title">Simulation Tweaks</div>
@@ -1248,13 +1287,13 @@
     <button class="tweaks-toggle" id="twk-auto" onclick="toggleTweak('auto', this)"></button>
   </div>
   <div class="tweaks-row">
-    <span>Milky Way Band</span>
+    <span>Milky Way Galaxy Band</span>
     <button class="tweaks-toggle on" id="twk-milky" onclick="toggleTweak('milky', this)"></button>
   </div>
 </div>
 
 <!-- =========================================================================
-     THREE.JS 3D ENGINE & MISSION SIMULATION
+     THREE.JS 3D ENGINE & PRECISION SQUARE-PIXEL SIMULATION
      ========================================================================= -->
 <script>
 /* ============================================================
@@ -1278,6 +1317,10 @@ let orbitCount = 1;
 
 // Camera mode: 'global' | 'sat' | 'debris-N'
 let cameraMode = 'global';
+let isFlyingTo = false;
+
+// Illumination mode: 'full' (Full Lit) vs 'shade' (Day/Night)
+let illuminationMode = 'full';
 
 // Mission Score
 let dodgedCount = 0;
@@ -1293,7 +1336,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+// Space canvas background is ALWAYS deep cosmic black
+renderer.setClearColor(0x040508, 1);
+
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x040508);
+
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2500);
 camera.position.set(0, 48, 150);
 
@@ -1302,43 +1350,74 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 0.8;
 controls.maxDistance = 260.0;
+// Disable accidental panning so Earth is ALWAYS pinned at center
 controls.enablePan = false;
 
-function updateSceneBackground() {
-  const isLight = document.documentElement.dataset.theme === 'light';
-  renderer.setClearColor(isLight ? 0xEEF2F6 : 0x07080C, 1);
-  if (milkyWayMesh) milkyWayMesh.visible = tweaks.milky && !isLight;
-}
-
 /* ============================================================
-   PRE-ALLOCATED SCRATCH VECTORS (Zero Garbage Collection in loop)
+   PRE-ALLOCATED SCRATCH VECTORS (Zero Garbage Collection)
    ============================================================ */
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
-const _v3 = new THREE.Vector3();
 const _scratchCam = new THREE.Vector3();
 
 /* ============================================================
-   LIGHTING
+   LIGHTING ENGINE (DAYLIGHT / FULL LIT TOGGLE)
    ============================================================ */
-const ambientLight = new THREE.AmbientLight(0x445577, 0.65);
+// Default to Full Lit (Even Global Illumination from all 360° angles)
+const ambientLight = new THREE.AmbientLight(0xFFFFFF, 2.2);
 scene.add(ambientLight);
 
-const sunLight = new THREE.DirectionalLight(0xFFF6E8, 1.45);
+const sunLight = new THREE.DirectionalLight(0xFFF6E8, 0.35);
 sunLight.position.set(220, 90, 110);
 sunLight.castShadow = true;
 scene.add(sunLight);
 
-const rimLight = new THREE.DirectionalLight(0x3B82F6, 0.35);
+const rimLight = new THREE.DirectionalLight(0x3B82F6, 0.25);
 rimLight.position.set(-160, 60, -90);
 scene.add(rimLight);
 
+function setIllumination(mode) {
+  illuminationMode = mode;
+  const btn = document.getElementById('btn-light-toggle');
+  const txt = document.getElementById('light-mode-text');
+
+  if (mode === 'full') {
+    // 100% brightly lit from all angles
+    ambientLight.intensity = 2.2;
+    sunLight.intensity = 0.35;
+    rimLight.intensity = 0.25;
+    btn.classList.add('active');
+    txt.textContent = 'Full Lit';
+  } else {
+    // Directional Day/Night Shade with generous ambient fill so night is never pitch black
+    ambientLight.intensity = 0.85;
+    sunLight.intensity = 1.45;
+    rimLight.intensity = 0.40;
+    btn.classList.remove('active');
+    txt.textContent = 'Day-Night';
+  }
+}
+
+function toggleIllumination() {
+  setIllumination(illuminationMode === 'full' ? 'shade' : 'full');
+}
+
 /* ============================================================
-   STARFIELD & MILKY WAY PARTICLES
+   SQUARE-PIXEL STARFIELD & MILKY WAY GALAXY BAND
    ============================================================ */
 let milkyWayMesh;
-(function buildStarfield() {
-  const count = 1500;
+(function buildSquarePixelStarfield() {
+  // Generate square particle texture
+  const sqCvs = document.createElement('canvas');
+  sqCvs.width = 4; sqCvs.height = 4;
+  const sqCtx = sqCvs.getContext('2d');
+  sqCtx.fillStyle = '#FFFFFF';
+  sqCtx.fillRect(0, 0, 4, 4);
+  const sqTex = new THREE.CanvasTexture(sqCvs);
+  sqTex.magFilter = THREE.NearestFilter;
+  sqTex.minFilter = THREE.NearestFilter;
+
+  const count = 1600;
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -1349,7 +1428,7 @@ let milkyWayMesh;
     positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
     positions[i*3+2] = r * Math.cos(phi);
 
-    const b = 0.6 + Math.random() * 0.4;
+    const b = 0.65 + Math.random() * 0.35;
     const p = Math.random();
     if (p < 0.2) { colors[i*3]=b*0.8; colors[i*3+1]=b*0.88; colors[i*3+2]=b; }
     else if (p < 0.4) { colors[i*3]=b; colors[i*3+1]=b*0.92; colors[i*3+2]=b*0.75; }
@@ -1358,10 +1437,10 @@ let milkyWayMesh;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const mat = new THREE.PointsMaterial({ size: 1.0, vertexColors: true, sizeAttenuation: true });
+  const mat = new THREE.PointsMaterial({ size: 1.8, map: sqTex, transparent: true, vertexColors: true, sizeAttenuation: true });
   scene.add(new THREE.Points(geo, mat));
 
-  // Subtle Milky Way dust band
+  // Subtle square-pixel Milky Way galaxy band
   const mwCount = 500;
   const mwPos = new Float32Array(mwCount * 3);
   for (let i = 0; i < mwCount; i++) {
@@ -1374,88 +1453,127 @@ let milkyWayMesh;
   }
   const mwGeo = new THREE.BufferGeometry();
   mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPos, 3));
-  const mwMat = new THREE.PointsMaterial({ size: 1.6, color: 0x93C5FD, transparent: true, opacity: 0.16, sizeAttenuation: true });
+  const mwMat = new THREE.PointsMaterial({ size: 2.2, map: sqTex, color: 0x93C5FD, transparent: true, opacity: 0.18, sizeAttenuation: true });
   milkyWayMesh = new THREE.Points(mwGeo, mwMat);
   milkyWayMesh.rotation.z = 0.45;
   scene.add(milkyWayMesh);
 })();
 
 /* ============================================================
-   PIXEL-ART RETRO-TACTICAL EARTH MODEL
+   TRUE SQUARE-PIXEL EARTH (SMOOTH SPHERE + 360x180 NEAREST-FILTER)
    ============================================================ */
-// 1. Procedural pixelated Earth texture via high-res offscreen canvas
-function createPixelEarthTexture() {
-  const w = 2048, h = 1024;
+const earthGroup = new THREE.Group();
+// Earth MUST never move in space — pinned strictly at world origin
+earthGroup.position.set(0, 0, 0);
+scene.add(earthGroup);
+
+function createSquarePixelEarthTexture() {
+  const w = 360, h = 180;
   const cvs = document.createElement('canvas');
   cvs.width = w; cvs.height = h;
   const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
 
-  // Deep matte navy oceans
-  ctx.fillStyle = '#0F253D';
-  ctx.fillRect(0, 0, w, h);
+  // Geographic classification function for 1° x 1° pixel grid
+  function getPixelCategory(lon, lat) {
+    if (lat < -62) return 'ice';
+    if (60 <= lat <= 83 && -72 <= lon <= -12) return lat > 72 ? 'ice' : 'land';
+    if (lat >= 80) return 'ice';
 
-  // Tactical Lat/Lon Graticule lines
-  ctx.strokeStyle = 'rgba(30, 75, 125, 0.45)';
-  ctx.lineWidth = 2;
-  for (let lat = -60; lat <= 60; lat += 30) {
-    const y = ((90 - lat) / 180) * h;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    // North America
+    if (10 <= lat < 72 && -168 <= lon <= -52) {
+      if (18 <= lat <= 30 && -98 <= lon <= -82) return 'ocean';
+      if (10 <= lat <= 20 && -82 <= lon <= -60) return 'shallow';
+      if (51 <= lat <= 64 && -95 <= lon <= -78) return 'ocean';
+      return 'land';
+    }
+
+    // South America
+    if (-56 <= lat < 12 && -82 <= lon <= -34) {
+      if (lat < -20 && lon > -45 - (lat + 20) * 0.6) return 'ocean';
+      if (lat < -10 && lon < -80 + (lat + 10) * 0.4) return 'ocean';
+      return 'land';
+    }
+
+    // Africa
+    if (-35 <= lat <= 37 && -18 <= lon <= 52) {
+      if (12 <= lat <= 28 && 33 <= lon <= 43) return 'ocean';
+      if (lat < 5 && lon > 42 + (lat - 5) * 0.4) return 'ocean';
+      if (-5 <= lat <= 5 && 5 <= lon <= 15) return 'shallow';
+      if (lat < -10 && lon < 12 - (lat + 10) * 0.3) return 'ocean';
+      if (18 <= lat <= 32 && -14 <= lon <= 35) return 'desert';
+      return 'land';
+    }
+
+    // Europe
+    if (36 <= lat <= 71 && -10 <= lon <= 40) {
+      if (32 <= lat <= 42 && -5 <= lon <= 25) return 'ocean';
+      if (54 <= lat <= 65 && 15 <= lon <= 26) return 'shallow';
+      if (41 <= lat <= 47 && 28 <= lon <= 42) return 'ocean';
+      return 'land';
+    }
+
+    // Asia & Middle East
+    if (5 <= lat <= 75 && 40 <= lon <= 180) {
+      if (12 <= lat <= 32 && 35 <= lon <= 60) return (15 <= lat <= 28 && 38 <= lon <= 55) ? 'desert' : 'land';
+      if (24 <= lat <= 30 && 48 <= lon <= 56) return 'shallow';
+      if (36 <= lat <= 47 && 47 <= lon <= 54) return 'ocean';
+      if (8 <= lat <= 34 && 68 <= lon <= 90) {
+        if (lat < 22 && (lon < 72 + (22 - lat)*0.6 || lon > 86 - (22 - lat)*0.7)) return 'ocean';
+        return 'land';
+      }
+      if (10 <= lat <= 22 && 82 <= lon <= 94) return 'ocean';
+      if (5 <= lat <= 20 && 105 <= lon <= 120) return 'shallow';
+      if (38 <= lat <= 46 && 85 <= lon <= 110) return 'desert';
+      return 'land';
+    }
+
+    // Australia
+    if (-44 <= lat <= -10 && 112 <= lon <= 154) {
+      if (-44 <= lat <= -33 && 120 <= lon <= 138) return 'shallow';
+      if (-30 <= lat <= -18 && 120 <= lon <= 142) return 'desert';
+      return 'land';
+    }
+
+    // Indonesia & Japan
+    if (-10 <= lat <= 15 && 95 <= lon <= 140) {
+      if ((lon + lat) % 4 === 0) return 'land';
+    }
+    if (30 <= lat <= 50 && 128 <= lon <= 146) {
+      if (Math.abs(lon - (130 + (lat - 30)*0.8)) < 3) return 'land';
+    }
+
+    if (lat > 72 || lat < -58) return 'shallow';
+    return 'ocean';
   }
-  for (let lon = -180; lon <= 180; lon += 30) {
-    const x = ((lon + 180) / 360) * w;
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+
+  // Exact Square-Pixel Color Palette
+  const colors = {
+    ocean:   ['#0D3B66', '#114B82'],
+    shallow: ['#1A659E', '#145385'],
+    land:    ['#2D6A4F', '#40916C'],
+    desert:  ['#C9A66B', '#B08968'],
+    ice:     ['#F1F5F9', '#FFFFFF']
+  };
+
+  // Render every single pixel onto the 360x180 canvas
+  for (let y = 0; y < h; y++) {
+    const lat = 90 - y;
+    for (let x = 0; x < w; x++) {
+      const lon = x - 180;
+      const cat = getPixelCategory(lon, lat);
+      const palette = colors[cat];
+      const col = palette[(x + y) % palette.length];
+      ctx.fillStyle = col;
+      ctx.fillRect(x, y, 1, 1);
+    }
   }
 
-  // Draw Continents with pixelated aesthetic
-  function fillGeo(minLon, maxLon, minLat, maxLat, color) {
-    const x = ((minLon + 180) / 360) * w;
-    const y = ((90 - maxLat) / 180) * h;
-    const rw = ((maxLon - minLon) / 360) * w;
-    const rh = ((maxLat - minLat) / 180) * h;
-    ctx.fillStyle = color;
-    ctx.fillRect(x, y, rw, rh);
-  }
-
-  const cLand = '#285C3A';  // Natural Green
-  const cSahara = '#826A37'; // Ochre Sahara
-  const cIce = '#D8E8F5';   // Polar ice
-  const cIndia = '#2D6B42'; // India subcontinent
-
-  // Eurasia & Europe
-  fillGeo(-10, 50, 36, 70, cLand);
-  fillGeo(50, 140, 25, 75, cLand);
-  fillGeo(90, 130, 15, 45, cLand);
-
-  // Africa
-  fillGeo(-18, 52, 10, 36, cSahara); // North Africa / Sahara
-  fillGeo(-15, 45, -35, 10, cLand);  // Central & South Africa
-
-  // Indian Subcontinent (Prominent)
-  fillGeo(68, 89, 7, 34, cIndia);
-  fillGeo(72, 85, 10, 24, '#24613A');
-
-  // Americas
-  fillGeo(-168, -55, 15, 72, cLand); // North America
-  fillGeo(-82, -34, -55, 12, cLand); // South America
-
-  // Australia & Oceania
-  fillGeo(112, 154, -44, -10, '#755F32');
-  fillGeo(95, 150, -10, 10, cLand);  // Indonesia / SE Asia
-
-  // Polar caps
-  fillGeo(-180, 180, 75, 90, cIce);
-  fillGeo(-180, 180, -90, -68, cIce);
-
-  // Highlight ISRO ISTRAC Bengaluru (12.97°N, 77.59°E)
-  const bx = ((77.59 + 180) / 360) * w;
-  const by = ((90 - 12.97) / 180) * h;
+  // Highlight ISRO ISTRAC Bengaluru Ground Station (12.97°N, 77.59°E)
+  const bx = Math.round(77.59 + 180);
+  const by = Math.round(90 - 12.97);
   ctx.fillStyle = '#FF4F00';
-  ctx.beginPath();
-  ctx.arc(bx, by, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  ctx.fillRect(bx - 1, by - 1, 2, 2);
 
   const tex = new THREE.CanvasTexture(cvs);
   tex.magFilter = THREE.NearestFilter;
@@ -1464,17 +1582,18 @@ function createPixelEarthTexture() {
   return tex;
 }
 
-const earthTexture = createPixelEarthTexture();
-const earthGeo = new THREE.IcosahedronGeometry(R_EARTH, 4);
-const earthMat = new THREE.MeshPhongMaterial({
-  map: earthTexture,
-  flatShading: true,
+// 1. High-segment smooth sphere silhouette (NO triangular facets!)
+const smoothEarthGeo = new THREE.SphereGeometry(R_EARTH, 128, 128);
+const squarePixelEarthTex = createSquarePixelEarthTexture();
+const smoothEarthMat = new THREE.MeshPhongMaterial({
+  map: squarePixelEarthTex,
+  flatShading: false, // Smooth round silhouette
   shininess: 12,
   specular: new THREE.Color(0x1B3552),
 });
-const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+const earthMesh = new THREE.Mesh(smoothEarthGeo, smoothEarthMat);
 earthMesh.receiveShadow = true;
-scene.add(earthMesh);
+earthGroup.add(earthMesh);
 
 // 2. Crisp Lat/Lon Geodesic Wireframe Overlay
 const gridGeo = new THREE.IcosahedronGeometry(R_EARTH * 1.002, 4);
@@ -1482,13 +1601,13 @@ const gridMat = new THREE.MeshBasicMaterial({
   color: 0x1E4A75,
   wireframe: true,
   transparent: true,
-  opacity: 0.32,
+  opacity: 0.28,
 });
 const gridMesh = new THREE.Mesh(gridGeo, gridMat);
-scene.add(gridMesh);
+earthGroup.add(gridMesh);
 
 // 3. Subtle Atmosphere Horizon Rim
-const atmGeo = new THREE.SphereGeometry(R_EARTH * 1.026, 32, 32);
+const atmGeo = new THREE.SphereGeometry(R_EARTH * 1.026, 64, 64);
 const atmMat = new THREE.MeshPhongMaterial({
   color: 0x38BDF8,
   transparent: true,
@@ -1496,9 +1615,9 @@ const atmMat = new THREE.MeshPhongMaterial({
   side: THREE.BackSide,
   depthWrite: false,
 });
-scene.add(new THREE.Mesh(atmGeo, atmMat));
+earthGroup.add(new THREE.Mesh(atmGeo, atmMat));
 
-// 4. ISRO ISTRAC Ground Station 3D Marker (Bengaluru at 12.97°N, 77.59°E)
+// 4. ISRO ISTRAC Ground Station 3D Physical Marker
 (function buildISTRACMarker() {
   const lat = 12.97 * Math.PI / 180;
   const lon = 77.59 * Math.PI / 180;
@@ -1507,18 +1626,14 @@ scene.add(new THREE.Mesh(atmGeo, atmMat));
   const y = r * Math.sin(lat);
   const z = r * Math.cos(lat) * Math.sin(lon);
 
-  const dotGeo = new THREE.SphereGeometry(0.24, 8, 8);
-  const dotMat = new THREE.MeshBasicMaterial({ color: 0xFF4F00 });
-  const dot = new THREE.Mesh(dotGeo, dotMat);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFF4F00 }));
   dot.position.set(x, y, z);
-  scene.add(dot);
+  earthGroup.add(dot);
 
-  const ringGeo = new THREE.RingGeometry(0.35, 0.52, 16);
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xFF4F00, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.52, 16), new THREE.MeshBasicMaterial({ color: 0xFF4F00, side: THREE.DoubleSide, transparent: true, opacity: 0.75 }));
   ring.position.set(x, y, z);
   ring.lookAt(0, 0, 0);
-  scene.add(ring);
+  earthGroup.add(ring);
 })();
 
 /* ============================================================
@@ -1545,7 +1660,7 @@ const satOrbitRing = createOrbitRing(R_ORBIT, 32, 0x3B82F6, 0.40);
 orbitRingsGroup.add(satOrbitRing);
 
 /* ============================================================
-   ISRO CARTOSAT-3 SATELLITE (TRUE SCALE + LOW-POLY)
+   ISRO CARTOSAT-3 SATELLITE (TRUE SCALE + DETAIL)
    ============================================================ */
 const satGroup = new THREE.Group();
 scene.add(satGroup);
@@ -1562,7 +1677,6 @@ const wingMat = new THREE.MeshPhongMaterial({ color: 0x1E3A8A, flatShading: true
   wing.position.set(side * (SAT_SIZE * 0.5 + SAT_SIZE * 0.8), 0, 0);
   satGroup.add(wing);
 
-  // Solar cells
   const cellMat = new THREE.MeshPhongMaterial({ color: 0x0A1938, flatShading: true });
   for (let c = -1; c <= 1; c += 2) {
     const cell = new THREE.Mesh(new THREE.BoxGeometry(SAT_SIZE * 0.45, SAT_SIZE * 0.045, SAT_SIZE * 0.58), cellMat);
@@ -1571,7 +1685,7 @@ const wingMat = new THREE.MeshPhongMaterial({ color: 0x1E3A8A, flatShading: true
   }
 });
 
-// High-resolution optical camera cone
+// Optical camera cone
 const camCone = new THREE.Mesh(new THREE.ConeGeometry(SAT_SIZE * 0.22, SAT_SIZE * 0.42, 8), new THREE.MeshPhongMaterial({ color: 0x64748B, flatShading: true }));
 camCone.rotation.z = -Math.PI / 2;
 camCone.position.set(0, 0, SAT_SIZE * 0.6);
@@ -1683,7 +1797,7 @@ function updateActiveThreatSelection() {
 updateActiveThreatSelection();
 
 /* ============================================================
-   SATELLITE ORBITAL MECHANICS
+   SATELLITE & DEBRIS ORBITAL POSITIONS
    ============================================================ */
 let satAngle = 0;
 const SAT_INCL = 32 * Math.PI / 180;
@@ -1706,7 +1820,98 @@ function getDebrisPosition(d) {
 }
 
 /* ============================================================
-   RAYCASTER & CLICK-TO-ZOOM / CAMERA TRACKING
+   GOOGLE EARTH GSAP FLY-TO CAMERA ANIMATIONS
+   ============================================================ */
+function flyToCamera(targetPos, desiredDist = 12, onComplete = null) {
+  isFlyingTo = true;
+  _v1.copy(camera.position).sub(targetPos).normalize().multiplyScalar(desiredDist).add(targetPos);
+
+  if (window.gsap) {
+    gsap.killTweensOf(camera.position);
+    gsap.killTweensOf(controls.target);
+
+    // Smooth Google Earth Fly-To easing
+    gsap.to(controls.target, {
+      x: targetPos.x,
+      y: targetPos.y,
+      z: targetPos.z,
+      duration: 1.25,
+      ease: "power2.out"
+    });
+
+    gsap.to(camera.position, {
+      x: _v1.x,
+      y: _v1.y,
+      z: _v1.z,
+      duration: 1.35,
+      ease: "power2.inOut",
+      onUpdate: () => controls.update(),
+      onComplete: () => {
+        isFlyingTo = false;
+        if (onComplete) onComplete();
+      }
+    });
+  } else {
+    controls.target.copy(targetPos);
+    camera.position.copy(_v1);
+    controls.update();
+    isFlyingTo = false;
+    if (onComplete) onComplete();
+  }
+}
+
+function focusObject(mode, idx) {
+  cameraMode = mode === 'debris' ? `debris-${idx}` : mode;
+
+  const btnSat = document.getElementById('btn-focus-sat');
+  const btnThreat = document.getElementById('btn-focus-threat');
+  const dockCam = document.getElementById('dock-cam');
+  const camLbl = document.getElementById('cam-label');
+
+  btnSat.classList.toggle('active', mode === 'sat');
+  btnThreat.classList.toggle('active', mode === 'debris');
+
+  if (mode === 'global') {
+    dockCam.className = 'dock-cam';
+    camLbl.textContent = 'Global View';
+
+    if (window.gsap) {
+      isFlyingTo = true;
+      gsap.killTweensOf(camera.position);
+      gsap.killTweensOf(controls.target);
+
+      gsap.to(controls.target, { x: 0, y: 0, z: 0, duration: 1.1, ease: "power2.out" });
+      gsap.to(camera.position, {
+        x: 0, y: 48, z: 150,
+        duration: 1.3,
+        ease: "power2.inOut",
+        onUpdate: () => controls.update(),
+        onComplete: () => { isFlyingTo = false; }
+      });
+    } else {
+      controls.target.set(0, 0, 0);
+      camera.position.set(0, 48, 150);
+      controls.update();
+    }
+  } else if (mode === 'sat') {
+    dockCam.className = 'dock-cam safe';
+    camLbl.textContent = 'Tracking CARTOSAT-3';
+    const sPos = getSatPosition(satAngle);
+    flyToCamera(sPos, 12);
+  } else {
+    dockCam.className = 'dock-cam locked';
+    activeThreatIdx = idx;
+    debrisSwarm.forEach((d, j) => { d.isActive = (j === idx); });
+    const targetDebris = debrisSwarm[idx];
+    camLbl.textContent = `Tracking ${targetDebris.name.split(' ')[0]}`;
+
+    const dPos = getDebrisPosition(targetDebris);
+    flyToCamera(dPos, 10);
+  }
+}
+
+/* ============================================================
+   RAYCASTER CLICK DETECTION
    ============================================================ */
 const raycaster = new THREE.Raycaster();
 raycaster.params.Points.threshold = 3;
@@ -1748,55 +1953,12 @@ canvas.addEventListener('click', (e) => {
   }
 });
 
-function focusObject(mode, idx) {
-  cameraMode = mode === 'debris' ? `debris-${idx}` : mode;
-
-  const dot = document.getElementById('cam-dot');
-  const lbl = document.getElementById('cam-label');
-  const btnSat = document.getElementById('btn-focus-sat');
-  const btnThreat = document.getElementById('btn-focus-threat');
-
-  btnSat.classList.toggle('active', mode === 'sat');
-  btnThreat.classList.toggle('active', mode === 'debris');
-
-  if (mode === 'global') {
-    dot.className = 'dock-cam-dot';
-    lbl.textContent = 'Global View';
-    controls.target.set(0, 0, 0);
-    // Smoothly pull camera back if zoomed in close
-    if (camera.position.length() < 90) {
-      camera.position.normalize().multiplyScalar(150);
-    }
-  } else if (mode === 'sat') {
-    dot.className = 'dock-cam-dot safe';
-    lbl.textContent = 'Tracking CARTOSAT-3';
-    // Zoom close if far
-    const sPos = getSatPosition(satAngle);
-    if (camera.position.distanceTo(sPos) > 35) {
-      _scratchCam.copy(camera.position).sub(sPos).normalize().multiplyScalar(12).add(sPos);
-      camera.position.copy(_scratchCam);
-    }
-    controls.target.copy(sPos);
-  } else {
-    dot.className = 'dock-cam-dot locked';
-    const targetDebris = debrisSwarm[idx];
-    lbl.textContent = `Tracking ${targetDebris.name.split(' ')[0]}`;
-    activeThreatIdx = idx;
-    debrisSwarm.forEach((d, j) => { d.isActive = (j === idx); });
-
-    const dPos = getDebrisPosition(targetDebris);
-    if (camera.position.distanceTo(dPos) > 35) {
-      _scratchCam.copy(camera.position).sub(dPos).normalize().multiplyScalar(10).add(dPos);
-      camera.position.copy(_scratchCam);
-    }
-    controls.target.copy(dPos);
-  }
-}
-
 /* ============================================================
    CAMERA CHASE & DELTA-TRANSLATION (PRESERVES USER ZOOM)
    ============================================================ */
 function updateCameraTarget(satPos) {
+  if (isFlyingTo) return;
+
   if (cameraMode === 'global') {
     controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
     return;
@@ -1838,7 +2000,13 @@ function animate() {
     orbitCount++;
   }
 
-  // Update Satellite Mesh
+  // 1. Earth: Pin strictly at origin + slow calm realistic axial rotation
+  earthGroup.position.set(0, 0, 0);
+  if (!paused) {
+    earthGroup.rotation.y += 0.00025 * speedMult;
+  }
+
+  // 2. Update Satellite Mesh
   const satPos = getSatPosition(satAngle);
   satGroup.position.copy(satPos);
   _v2.set(
@@ -1863,7 +2031,7 @@ function animate() {
     plumeMesh.scale.setScalar(0.85 + Math.sin(now * 0.025) * 0.2);
   }
 
-  // Update Debris Swarm
+  // 3. Update Debris Swarm
   debrisSwarm.forEach((d) => {
     if (!paused) {
       d.angle += SAT_BASE_SPEED * d.speedRatio * speedMult;
@@ -1892,7 +2060,6 @@ function animate() {
       d.rOrbit = R_ORBIT + (Math.random() - 0.5) * 3.0;
       d.angle = Math.random() * Math.PI * 2;
 
-      // Re-create orbit line
       const pts = [];
       const incl = d.inclDeg * Math.PI / 180;
       for (let j = 0; j <= 140; j++) {
@@ -1916,6 +2083,7 @@ function animate() {
   gridMesh.visible = tweaks.grid;
   satBeacon.visible = tweaks.beacons;
   debrisSwarm.forEach(d => { d.beacon.visible = tweaks.beacons; });
+  if (milkyWayMesh) milkyWayMesh.visible = tweaks.milky;
 
   // Update Clock Dock
   document.getElementById('dock-clock-val').textContent = formatMET(simMET);
@@ -1937,7 +2105,7 @@ function animate() {
 let lastListUpdate = 0;
 function renderSwarmList() {
   const now = performance.now();
-  if (now - lastListUpdate < 150) return; // 6.6 Hz throttle
+  if (now - lastListUpdate < 150) return;
   lastListUpdate = now;
 
   const container = document.getElementById('swarm-list');
@@ -1946,15 +2114,16 @@ function renderSwarmList() {
     const isAct = d.isActive;
     const cls = isAct ? 'swarm-item active-threat' : 'swarm-item';
     const missCls = d.missDistKm < SAFETY_KM ? 'swarm-miss close' : 'swarm-miss';
-    const dotCol = isAct ? '#FF4F00' : (d.missDistKm < SAFETY_KM ? '#DC2626' : '#71717A');
+    const iconName = isAct ? 'alert-circle' : 'disc';
     html += `
       <div class="${cls}" onclick="focusObject('debris', ${i})">
-        <div class="swarm-dot" style="background:${dotCol}"></div>
+        <i data-lucide="${iconName}" class="swarm-icon"></i>
         <span class="swarm-name">${d.name}</span>
         <span class="${missCls}">${d.missDistKm.toFixed(2)} km</span>
       </div>`;
   });
   container.innerHTML = html;
+  if (window.lucide) lucide.createIcons();
 }
 
 function renderActiveThreatTelemetry() {
@@ -2044,15 +2213,17 @@ window.addEventListener('keydown', (e) => {
 });
 
 /* ============================================================
-   DARK & BRIGHT STUDIO THEME ENGINE
+   DARK & BRIGHT CHROME THEME (CANVAS REMAINS SPACE BLACK)
    ============================================================ */
 function toggleTheme() {
   const html = document.documentElement;
   const isLight = html.dataset.theme === 'light';
   html.dataset.theme = isLight ? 'dark' : 'light';
-  document.getElementById('theme-icon-dark').style.display = isLight ? 'block' : 'none';
-  document.getElementById('theme-icon-light').style.display = isLight ? 'none' : 'block';
-  updateSceneBackground();
+  document.getElementById('theme-icon-dark').style.display = isLight ? 'inline-block' : 'none';
+  document.getElementById('theme-icon-light').style.display = isLight ? 'none' : 'inline-block';
+  // Space canvas is always black in both themes
+  renderer.setClearColor(0x040508, 1);
+  scene.background = new THREE.Color(0x040508);
 }
 
 /* ============================================================
@@ -2067,7 +2238,7 @@ async function runOptimize() {
   const miss_km = parseFloat(document.getElementById('sl-miss').value);
   const active = debrisSwarm[activeThreatIdx];
 
-  // Schema matching src/api.py ConjunctionInput model
+  // Exact ConjunctionInput schema for src/api.py
   const payload = {
     conjunction_id: 1000 + activeThreatIdx,
     active_sat_norad_id: 44804,
@@ -2101,7 +2272,8 @@ async function runOptimize() {
 
   displayManeuverResult(result, miss_km);
   btn.disabled = false;
-  btn.innerHTML = `<svg viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg> Compute Optimal CAM`;
+  btn.innerHTML = `<i data-lucide="zap"></i> Compute Optimal CAM`;
+  if (window.lucide) lucide.createIcons();
 }
 
 function localCWSolver(tca_h, miss_km) {
@@ -2177,10 +2349,8 @@ function displayManeuverResult(r, preMiss) {
 let activeDodgeArc = null;
 
 function triggerThrusterDodge(postMiss) {
-  // Fire thruster plume
   plumeMesh.visible = true;
 
-  // Emerald safe trajectory curve
   if (activeDodgeArc) scene.remove(activeDodgeArc);
   const arcPts = [];
   for (let i = 0; i <= 36; i++) {
@@ -2296,7 +2466,7 @@ function toggleTweak(k, btn) {
   tweaks[k] = !tweaks[k];
   btn.classList.toggle('on', tweaks[k]);
   if (k === 'auto') autoOptimize = tweaks[k];
-  if (k === 'milky') updateSceneBackground();
+  if (k === 'milky' && milkyWayMesh) milkyWayMesh.visible = tweaks[k];
 }
 
 /* ============================================================
@@ -2315,7 +2485,7 @@ canvas.addEventListener('mousemove', (e) => {
     tooltip.style.display = 'block';
     tooltip.style.left = (e.clientX - rect.left + 14) + 'px';
     tooltip.style.top  = (e.clientY - rect.top  - 10) + 'px';
-    tooltip.textContent = 'ISRO CARTOSAT-3 · Click to track';
+    tooltip.textContent = 'ISRO CARTOSAT-3 · Click to fly to';
     canvas.style.cursor = 'pointer';
     return;
   }
@@ -2348,15 +2518,16 @@ function formatMET(sec) {
 /* ============================================================
    BOOT ENGINE
    ============================================================ */
-updateSceneBackground();
+// Set initial illumination to Full Lit
+setIllumination('full');
+
+// Start animation loop
 animate();
 
-// Sync initial theme icons
-(function initTheme() {
-  const isLight = document.documentElement.dataset.theme === 'light';
-  document.getElementById('theme-icon-dark').style.display = isLight ? 'none' : 'block';
-  document.getElementById('theme-icon-light').style.display = isLight ? 'block' : 'none';
-})();
+// Initialize Lucide Icons
+if (window.lucide) {
+  lucide.createIcons();
+}
 </script>
 </body>
 </html>
