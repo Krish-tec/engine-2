@@ -356,6 +356,102 @@
       z-index: 20;
     }
 
+    /* Single-Shot Critical Collision Aftermath Overlay Banner */
+    #impact-modal-overlay {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 22px;
+      background: rgba(18, 18, 21, 0.94);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 79, 0, 0.45);
+      border-radius: var(--r-md);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 24px rgba(255, 79, 0, 0.22);
+      z-index: 35;
+      text-align: center;
+      animation: modalFadeIn 0.35s var(--easing);
+    }
+    [data-theme="mono"] #impact-modal-overlay {
+      background: rgba(10, 10, 10, 0.95);
+      border: 1px solid #FFFFFF;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 255, 255, 0.25);
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: translate(-50%, -12px) scale(0.96); }
+      to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    }
+    .impact-modal-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #FF4F00;
+      background: rgba(255, 79, 0, 0.12);
+      padding: 4px 10px;
+      border-radius: 9999px;
+    }
+    [data-theme="mono"] .impact-modal-badge {
+      color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .impact-modal-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text-1);
+      letter-spacing: -0.01em;
+    }
+    .impact-modal-sub {
+      font-size: 12px;
+      color: var(--text-2);
+      max-width: 380px;
+      line-height: 1.45;
+    }
+    .impact-modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .impact-modal-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+    .impact-modal-btn.pri {
+      background: var(--accent);
+      color: #FFFFFF;
+    }
+    .impact-modal-btn.pri:hover {
+      background: var(--accent-hover);
+    }
+    [data-theme="mono"] .impact-modal-btn.pri {
+      background: #FFFFFF;
+      color: #000000;
+    }
+    .impact-modal-btn.sec {
+      background: var(--surface-2);
+      border-color: var(--border-hard);
+      color: var(--text-1);
+    }
+    .impact-modal-btn.sec:hover {
+      background: var(--surface-hover);
+    }
+
     /* ---- RIGHT SIDEBAR ---- */
     #sidebar {
       grid-column: 2;
@@ -1053,6 +1149,26 @@
   <main id="canvas-wrap">
     <canvas id="three-canvas"></canvas>
     <div id="obj-tooltip"></div>
+
+    <!-- Single-Shot Critical Collision Aftermath Banner -->
+    <div id="impact-modal-overlay">
+      <div class="impact-modal-badge">
+        <i data-lucide="alert-octagon" style="width:13px;height:13px"></i>
+        <span>Critical Event</span>
+      </div>
+      <div class="impact-modal-title">CRITICAL IMPACT OCCURRED AT 0.15 km</div>
+      <div class="impact-modal-sub">Physical orbital collision verified. Orbital trajectory progression held. Activate Engine 2 AI CAM to compute collision avoidance dodge.</div>
+      <div class="impact-modal-actions">
+        <button class="impact-modal-btn sec" onclick="replayCollisionImpact()">
+          <i data-lucide="rotate-ccw" style="width:13px;height:13px"></i>
+          <span>Replay Impact</span>
+        </button>
+        <button class="impact-modal-btn pri" onclick="activateEngine2Dodge()">
+          <i data-lucide="zap" style="width:13px;height:13px"></i>
+          <span>Activate Engine 2 AI Dodge</span>
+        </button>
+      </div>
+    </div>
   </main>
 
   <!-- =========================================================================
@@ -1400,13 +1516,18 @@ let isFlyingTo = false;
 // Illumination mode: 'full' (Full Lit) vs 'shade' (Day/Night)
 let illuminationMode = 'full';
 
-// Physical Collision Intercept State
+// Physical Collision Intercept State (Single-Shot Collision Architecture)
 let interceptState = {
   active: false,
+  completed: false,
   debris: null,
-  startPos: new THREE.Vector3(),
+  startAngle: 0,
+  targetAngle: 0,
+  startIncl: 0,
+  targetIncl: 32 * Math.PI / 180,
   progress: 0,
-  duration: 3.2
+  duration: 3.5,
+  impactPoint: new THREE.Vector3()
 };
 
 // Mission Score
@@ -1435,7 +1556,7 @@ camera.position.set(0, 48, 150);
 const controls = new THREE.OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 0.8;
+controls.minDistance = R_EARTH + 2.8; // 66.51 units: Camera can NEVER penetrate Earth
 controls.maxDistance = 260.0;
 // Disable accidental panning so Earth is ALWAYS pinned strictly at origin (0,0,0)
 controls.enablePan = false;
@@ -1535,13 +1656,13 @@ function isBehindEarth(camPos, objPos) {
 }
 
 /* ============================================================
-   DEEP SPACE: 360° OMNIDIRECTIONAL STARFIELD + VIBRANT MILKY WAY
+   DEEP SPACE: 360° OMNIDIRECTIONAL STARFIELD + ONE-SECTOR NEBULA MILKY WAY
    ============================================================ */
-let stars360Mesh, milkyWayMesh, nebulaClustersMesh;
+let stars360Mesh, milkyWayDustMesh, milkyWayCloudsGroup;
 
 // 1. FULL 360-DEGREE OMNIDIRECTIONAL CELESTIAL SPHERE STARFIELD
 (function build360OmnidirectionalStarfield() {
-  const starCount = 3500;
+  const starCount = 3600;
   const positions = new Float32Array(starCount * 3);
   const colors = new Float32Array(starCount * 3);
 
@@ -1578,7 +1699,7 @@ let stars360Mesh, milkyWayMesh, nebulaClustersMesh;
     else if (p < 0.982) tempCol.copy(starColors[5]);
     else tempCol.copy(starColors[6]);
 
-    const lum = 0.60 + Math.random() * 0.40;
+    const lum = 0.55 + Math.random() * 0.45;
     colors[i * 3]     = tempCol.r * lum;
     colors[i * 3 + 1] = tempCol.g * lum;
     colors[i * 3 + 2] = tempCol.b * lum;
@@ -1592,7 +1713,7 @@ let stars360Mesh, milkyWayMesh, nebulaClustersMesh;
     size: 2.2,
     vertexColors: true,
     transparent: true,
-    opacity: 0.90,
+    opacity: 0.92,
     sizeAttenuation: false
   });
 
@@ -1600,116 +1721,192 @@ let stars360Mesh, milkyWayMesh, nebulaClustersMesh;
   scene.add(stars360Mesh);
 })();
 
-// 2. VIBRANT PIXELATED MILKY WAY GALAXY BAND (9,500+ PARTICLES)
-(function buildVibrantMilkyWay() {
-  const mwCount = 9500;
-  const positions = new Float32Array(mwCount * 3);
-  const colors = new Float32Array(mwCount * 3);
+// 2. DIRECTIONAL ONE-SECTOR NEBULA MILKY WAY (110° SKY ARC BEHIND EARTH)
+(function buildOneSectorNebulaMilkyWay() {
+  // Center of localized Galactic Core in sky hemisphere behind Earth
+  const coreDir = new THREE.Vector3(-0.65, 0.35, -0.68).normalize();
 
-  // Astrophotography-accurate Cosmic Palette
-  const cCoreGold   = new THREE.Color(0xFBBF24); // Golden Yellow Core
-  const cCoreAmber  = new THREE.Color(0xF59E0B); // Galactic Center Amber
-  const cCoreRose   = new THREE.Color(0xF43F5E); // H-Alpha Emission Nebula Pink/Rose
-  const cCream      = new THREE.Color(0xFEF3C7); // Dense Starlight Cream
-  const cArmCyan    = new THREE.Color(0x06B6D4); // Reflection Nebula Cyan
-  const cArmIce     = new THREE.Color(0x38BDF8); // Young Hot Stars Ice Blue
-  const cArmViolet  = new THREE.Color(0x8B5CF6); // Ionized Gas Purple/Violet
-  const cArmIndigo  = new THREE.Color(0x6366F1); // Deep Cosmic Indigo
+  // Create an orthonormal coordinate frame for the galactic plane
+  const galUp = new THREE.Vector3(0.35, 0.92, -0.15).normalize();
+  const galRight = new THREE.Vector3().crossVectors(galUp, coreDir).normalize();
+  const galNormal = new THREE.Vector3().crossVectors(coreDir, galRight).normalize();
 
-  const tempCol = new THREE.Color();
+  // A. Generate Soft Pixel-Art Stepped Nebula Cloud Sprite Texture (256x256)
+  function createNebulaCloudSprite() {
+    const cSize = 256;
+    const cvs = document.createElement('canvas');
+    cvs.width = cSize; cvs.height = cSize;
+    const ctx = cvs.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
 
-  for (let i = 0; i < mwCount; i++) {
-    // Angle along the sweeping diagonal band across the sky
-    const a = (Math.random() - 0.5) * Math.PI * 2;
-    const distFromCore = Math.abs(a) / Math.PI;
+    // Stepped pixel-art radial density with subtle fractal dithering
+    const half = cSize / 2;
+    for (let y = 0; y < cSize; y += 4) {
+      for (let x = 0; x < cSize; x += 4) {
+        const dx = (x + 2 - half) / half;
+        const dy = (y + 2 - half) / half;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 1.0) {
+          let alpha = Math.pow(1.0 - d, 1.85);
+          if (((x / 4) + (y / 4)) % 2 === 0) alpha *= 0.92;
+          const aByte = Math.max(0, Math.min(255, Math.floor(alpha * 255)));
+          ctx.fillStyle = `rgba(255, 255, 255, ${aByte / 255})`;
+          ctx.fillRect(x, y, 4, 4);
+        }
+      }
+    }
+    const tex = new THREE.CanvasTexture(cvs);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    return tex;
+  }
 
-    // Galactic spine density profile (dense core, tapering along spiral arms)
-    const spreadWidth = 0.08 + distFromCore * 0.18;
-    const spread = (Math.random() - 0.5) * spreadWidth;
+  const nebulaTex = createNebulaCloudSprite();
+  milkyWayCloudsGroup = new THREE.Group();
+  scene.add(milkyWayCloudsGroup);
+
+  // B. 180 Overlapping Soft-Glowing Nebula Sprite Clouds in Localized 110° Arc
+  const cloudCount = 180;
+  const cloudColors = [
+    new THREE.Color(0xFFD166), // Warm Peach-Gold (Galactic Core Center)
+    new THREE.Color(0xFFF3B0), // Incandescent Cream
+    new THREE.Color(0xF4A261), // Fiery Amber-Orange
+    new THREE.Color(0xE07A5F), // Dusty Terracotta Rose
+    new THREE.Color(0xB56576), // Rich H-Alpha Magenta
+    new THREE.Color(0x6D597A), // Deep Cosmic Violet-Indigo
+    new THREE.Color(0x355070), // Stellar Midnight Blue
+    new THREE.Color(0x4EA8DE), // Soft Ionized Cyan
+  ];
+
+  for (let i = 0; i < cloudCount; i++) {
+    // Angular span strictly along ±55° arc in longitude
+    const u = (Math.random() - 0.5) * 1.8; // ~ ±52 degrees along galactic spine
+    const distFromCore = Math.abs(u);
+
+    // Tilted diagonal thickness along galactic latitude
+    const v = (Math.random() - 0.5) * (0.28 + distFromCore * 0.35);
     const r = 780 + Math.random() * 80;
 
-    positions[i * 3]     = r * Math.cos(a);
-    positions[i * 3 + 1] = r * Math.sin(a) * 0.45 + spread * r;
-    positions[i * 3 + 2] = r * Math.sin(a) * 0.88 + (Math.random() - 0.5) * 60;
+    const dir = new THREE.Vector3()
+      .copy(coreDir)
+      .addScaledVector(galRight, u)
+      .addScaledVector(galNormal, v)
+      .normalize();
 
-    // Color distribution: Warm Amber/Rose/Gold near Core; Electric Cyan/Violet/Ice Blue in Spiral Arms
-    if (distFromCore < 0.28) {
+    const pos = dir.clone().multiplyScalar(r);
+
+    let col;
+    if (distFromCore < 0.35) {
       const p = Math.random();
-      if (p < 0.40) tempCol.copy(cCoreGold);
-      else if (p < 0.70) tempCol.copy(cCoreAmber);
-      else if (p < 0.88) tempCol.copy(cCoreRose);
-      else tempCol.copy(cCream);
+      col = (p < 0.45) ? cloudColors[0] : (p < 0.75 ? cloudColors[1] : cloudColors[2]);
+    } else if (distFromCore < 0.65) {
+      const p = Math.random();
+      col = (p < 0.5) ? cloudColors[3] : cloudColors[4];
     } else {
       const p = Math.random();
-      if (p < 0.35) tempCol.copy(cArmCyan);
-      else if (p < 0.65) tempCol.copy(cArmViolet);
-      else if (p < 0.82) tempCol.copy(cArmIce);
-      else tempCol.copy(cArmIndigo);
+      col = (p < 0.4) ? cloudColors[5] : (p < 0.75 ? cloudColors[6] : cloudColors[7]);
     }
 
-    const lum = 0.70 + Math.random() * 0.30;
-    colors[i * 3]     = tempCol.r * lum;
-    colors[i * 3 + 1] = tempCol.g * lum;
-    colors[i * 3 + 2] = tempCol.b * lum;
+    const mat = new THREE.SpriteMaterial({
+      map: nebulaTex,
+      color: col,
+      transparent: true,
+      opacity: 0.08 + Math.random() * 0.10,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const sprite = new THREE.Sprite(mat);
+    sprite.position.copy(pos);
+    const scale = 75 + Math.random() * 95;
+    sprite.scale.set(scale, scale, 1);
+    milkyWayCloudsGroup.add(sprite);
   }
 
-  const mwGeo = new THREE.BufferGeometry();
-  mwGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  mwGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  // Dark Cosmic Dust Rift Veil in Core Center (The Great Rift)
+  const riftCount = 28;
+  const riftCol = new THREE.Color(0x040508);
+  for (let i = 0; i < riftCount; i++) {
+    const u = (Math.random() - 0.5) * 0.7;
+    const v = (Math.random() - 0.5) * 0.08;
+    const r = 770 + Math.random() * 40;
+    const dir = new THREE.Vector3().copy(coreDir).addScaledVector(galRight, u).addScaledVector(galNormal, v).normalize();
+    const pos = dir.clone().multiplyScalar(r);
 
-  const mwMat = new THREE.PointsMaterial({
-    size: 3.2,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.95,
-    sizeAttenuation: false
-  });
-  milkyWayMesh = new THREE.Points(mwGeo, mwMat);
-  milkyWayMesh.rotation.z = 0.52;
-  milkyWayMesh.rotation.x = 0.28;
-  scene.add(milkyWayMesh);
-
-  // Soft low-opacity volumetric nebula clusters along galactic spine
-  const nebCount = 500;
-  const nebPos = new Float32Array(nebCount * 3);
-  const nebCols = new Float32Array(nebCount * 3);
-
-  for (let i = 0; i < nebCount; i++) {
-    const a = (Math.random() - 0.5) * Math.PI * 2;
-    const r = 770 + Math.random() * 50;
-    nebPos[i * 3]     = r * Math.cos(a);
-    nebPos[i * 3 + 1] = r * Math.sin(a) * 0.45 + (Math.random() - 0.5) * 80;
-    nebPos[i * 3 + 2] = r * Math.sin(a) * 0.88 + (Math.random() - 0.5) * 80;
-
-    const col = (Math.abs(a) < 0.8) ? cCoreRose : cArmViolet;
-    nebCols[i * 3]     = col.r * 0.85;
-    nebCols[i * 3 + 1] = col.g * 0.85;
-    nebCols[i * 3 + 2] = col.b * 0.85;
+    const mat = new THREE.SpriteMaterial({
+      map: nebulaTex,
+      color: riftCol,
+      transparent: true,
+      opacity: 0.65 + Math.random() * 0.25,
+      blending: THREE.NormalBlending,
+      depthWrite: false
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.position.copy(pos);
+    const scale = 45 + Math.random() * 40;
+    sprite.scale.set(scale * 1.6, scale * 0.6, 1);
+    milkyWayCloudsGroup.add(sprite);
   }
-  const nebGeo = new THREE.BufferGeometry();
-  nebGeo.setAttribute('position', new THREE.BufferAttribute(nebPos, 3));
-  nebGeo.setAttribute('color', new THREE.BufferAttribute(nebCols, 3));
-  const nebMat = new THREE.PointsMaterial({
-    size: 16.0,
+
+  // C. 6,000 Fine Micro-Stars Along the Localized Core Spine
+  const microCount = 6000;
+  const microPos = new Float32Array(microCount * 3);
+  const microCols = new Float32Array(microCount * 3);
+  const tempC = new THREE.Color();
+
+  for (let i = 0; i < microCount; i++) {
+    const u = (Math.random() - 0.5) * 1.9;
+    const dist = Math.abs(u);
+    const v = (Math.random() - 0.5) * (0.16 + dist * 0.28);
+    const r = 790 + Math.random() * 70;
+
+    const dir = new THREE.Vector3().copy(coreDir).addScaledVector(galRight, u).addScaledVector(galNormal, v).normalize();
+    const p = dir.multiplyScalar(r);
+
+    microPos[i * 3]     = p.x;
+    microPos[i * 3 + 1] = p.y;
+    microPos[i * 3 + 2] = p.z;
+
+    if (dist < 0.35) {
+      tempC.setHex(Math.random() < 0.5 ? 0xFFF3B0 : 0xFFD166);
+    } else {
+      tempC.setHex(Math.random() < 0.6 ? 0xF0F4FF : 0x8B5CF6);
+    }
+
+    const lum = 0.55 + Math.random() * 0.45;
+    microCols[i * 3]     = tempC.r * lum;
+    microCols[i * 3 + 1] = tempC.g * lum;
+    microCols[i * 3 + 2] = tempC.b * lum;
+  }
+
+  const microGeo = new THREE.BufferGeometry();
+  microGeo.setAttribute('position', new THREE.BufferAttribute(microPos, 3));
+  microGeo.setAttribute('color', new THREE.BufferAttribute(microCols, 3));
+
+  const microMat = new THREE.PointsMaterial({
+    size: 2.4,
     vertexColors: true,
     transparent: true,
-    opacity: 0.14,
-    sizeAttenuation: false
+    opacity: 0.90,
+    sizeAttenuation: false,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
   });
-  nebulaClustersMesh = new THREE.Points(nebGeo, nebMat);
-  nebulaClustersMesh.rotation.copy(milkyWayMesh.rotation);
-  scene.add(nebulaClustersMesh);
+
+  milkyWayDustMesh = new THREE.Points(microGeo, microMat);
+  scene.add(milkyWayDustMesh);
 })();
 
 /* ============================================================
-   RIGID NON-SMOOTH PIXEL-ART EARTH (FACETED TOPOGRAPHY & CONTINENTS)
+   WATERTIGHT HIGH-DENSITY PIXEL-ART EARTH (ZERO SURFACE GAPS)
    ============================================================ */
 const earthGroup = new THREE.Group();
-// Earth MUST never move in space — pinned strictly at world origin
+// Earth MUST never move in space — pinned strictly at world origin (0, 0, 0)
 earthGroup.position.set(0, 0, 0);
 scene.add(earthGroup);
 
-// Comprehensive Earth Continental Polygons for Accurate World Landmasses
+// Continental Coordinate Polygons for Accurate World Landmasses
 const EARTH_CONTINENTS = {
   antarctica: [[-180, -64], [180, -64], [180, -90], [-180, -90]],
   greenland: [[-55, 60], [-40, 60], [-18, 70], [-18, 83], [-42, 83], [-60, 80], [-72, 76], [-55, 60]],
@@ -1737,126 +1934,175 @@ function isPointInContinentPoly(lon, lat, poly) {
   return inside;
 }
 
-function getEarthSurfaceCategory(lon, lat) {
-  if (lat < -62 || lat > 78) return 'ice';
-  for (const k in EARTH_CONTINENTS) {
-    if (isPointInContinentPoly(lon, lat, EARTH_CONTINENTS[k])) {
-      if (k === 'antarctica' || (k === 'greenland' && lat > 70)) return 'ice';
-      if (k === 'arabia') return 'desert';
-      if (k === 'africa' && lat >= 16 && lat <= 30 && lon >= -14 && lon <= 35) return 'desert';
-      if (k === 'australia' && lat >= -30 && lat <= -18 && lon >= 118 && lon <= 138) return 'desert';
-      if (k === 'eurasia' && lat >= 38 && lat <= 46 && lon >= 82 && lon <= 108) return 'desert';
-      return 'land';
+// 480x240 High-Density Watertight Pixel-Art Earth Texture
+function createWatertightPixelEarthTexture() {
+  const w = 480, h = 240;
+  const cvs = document.createElement('canvas');
+  cvs.width = w; cvs.height = h;
+  const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  // Grid classification: 0: ocean, 1: land, 2: desert, 3: ice
+  const grid = new Uint8Array(w * h);
+
+  for (let y = 0; y < h; y++) {
+    const lat = 90 - (y / h) * 180;
+    for (let x = 0; x < w; x++) {
+      const lon = (x / w) * 360 - 180;
+      if (lat < -62 || lat > 78) {
+        grid[y * w + x] = 3; // ice
+        continue;
+      }
+      let cat = 0;
+      for (const k in EARTH_CONTINENTS) {
+        if (isPointInContinentPoly(lon, lat, EARTH_CONTINENTS[k])) {
+          if (k === 'antarctica' || (k === 'greenland' && lat > 70)) cat = 3;
+          else if (k === 'arabia' || (k === 'africa' && lat >= 16 && lat <= 30 && lon >= -14 && lon <= 35) || (k === 'australia' && lat >= -30 && lat <= -18 && lon >= 118 && lon <= 138) || (k === 'eurasia' && lat >= 38 && lat <= 46 && lon >= 82 && lon <= 108)) cat = 2; // desert
+          else cat = 1; // land
+          break;
+        }
+      }
+      grid[y * w + x] = cat;
     }
   }
-  return 'ocean';
-}
 
-// Build Rigid Non-Smooth 3D Faceted Terrain Mesh
-let earthMesh;
-(function buildRigidFacetedEarth() {
-  // Use IcosahedronGeometry with detail 5 for crisp, rigid triangular low-poly topography
-  const icoGeo = new THREE.IcosahedronGeometry(R_EARTH, 5);
-  // Convert to non-indexed geometry so every facet has unique face normal (ensures true crisp flat shading)
-  const geo = icoGeo.toNonIndexed();
-  const posAttr = geo.attributes.position;
-  const count = posAttr.count;
-
-  const colorAttr = new Float32Array(count * 3);
-
-  // Palette definition
-  const colOceanDeep = new THREE.Color(0x0A2540);
-  const colOceanMid  = new THREE.Color(0x0E3A60);
-  const colLandGreen = new THREE.Color(0x2E7D32);
-  const colLandLush  = new THREE.Color(0x388E3C);
-  const colDesert    = new THREE.Color(0xD4A373);
-  const colDesertWarm= new THREE.Color(0xC29560);
-  const colIce       = new THREE.Color(0xF0F4F8);
-
-  const vTemp = new THREE.Vector3();
-  const triCol = new THREE.Color();
-
-  // Color each rigid triangular facet by evaluating its center coordinate
-  for (let i = 0; i < count; i += 3) {
-    // Triangle center in Cartesian coordinates
-    const cx = (posAttr.getX(i) + posAttr.getX(i+1) + posAttr.getX(i+2)) / 3;
-    const cy = (posAttr.getY(i) + posAttr.getY(i+1) + posAttr.getY(i+2)) / 3;
-    const cz = (posAttr.getZ(i) + posAttr.getZ(i+1) + posAttr.getZ(i+2)) / 3;
-
-    vTemp.set(cx, cy, cz).normalize();
-
-    // Convert (x, y, z) unit vector on sphere to geographic (lon, lat) in degrees
-    const lat = Math.asin(Math.max(-1, Math.min(1, vTemp.y))) * (180 / Math.PI);
-    const lon = Math.atan2(vTemp.z, vTemp.x) * (180 / Math.PI);
-
-    const terrain = getEarthSurfaceCategory(lon, lat);
-
-    let elevation = 1.0;
-    if (terrain === 'ocean') {
-      const shade = ((i / 3) % 2 === 0) ? colOceanDeep : colOceanMid;
-      triCol.copy(shade);
-      elevation = 1.0;
-    } else if (terrain === 'desert') {
-      const shade = ((i / 3) % 2 === 0) ? colDesert : colDesertWarm;
-      triCol.copy(shade);
-      elevation = 1.012; // Physically elevated plateau topography
-    } else if (terrain === 'ice') {
-      triCol.copy(colIce);
-      elevation = 1.008; // Polar ice elevation
-    } else {
-      // Lush vegetation land
-      const shade = ((i / 3) % 2 === 0) ? colLandGreen : colLandLush;
-      triCol.copy(shade);
-      elevation = 1.014; // Elevated continental landmasses
-    }
-
-    // Apply color and physical elevation to all 3 vertices of this facet
-    for (let j = 0; j < 3; j++) {
-      const idx = i + j;
-      colorAttr[idx * 3]     = triCol.r;
-      colorAttr[idx * 3 + 1] = triCol.g;
-      colorAttr[idx * 3 + 2] = triCol.b;
-
-      // Displace vertex outward if land/desert/ice to create rigid 3D elevation
-      if (elevation !== 1.0) {
-        vTemp.set(posAttr.getX(idx), posAttr.getY(idx), posAttr.getZ(idx));
-        const curR = vTemp.length();
-        vTemp.normalize().multiplyScalar(curR * elevation);
-        posAttr.setXYZ(idx, vTemp.x, vTemp.y, vTemp.z);
+  // Precompute distance to land (up to 3px) for smooth coastal shallow bands
+  const dist = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (grid[y * w + x] > 0) {
+        dist[y * w + x] = 0;
+      } else {
+        let minD = 99;
+        for (let dy = -3; dy <= 3; dy++) {
+          const ny = y + dy;
+          if (ny < 0 || ny >= h) continue;
+          for (let dx = -3; dx <= 3; dx++) {
+            const nx = (x + dx + w) % w;
+            if (grid[ny * w + nx] > 0) {
+              const d = Math.abs(dx) + Math.abs(dy);
+              if (d < minD) minD = d;
+            }
+          }
+        }
+        dist[y * w + x] = Math.min(255, minD);
       }
     }
   }
 
-  geo.setAttribute('color', new THREE.BufferAttribute(colorAttr, 3));
-  geo.computeVertexNormals();
+  // Pixel-Art Biome Palette (Matching Reference d8573c)
+  const PALETTE = {
+    oceanAbyss:   '#0B2545', // Deep Abyssal Navy
+    oceanMid:     '#134074', // Mid-Ocean Cerulean
+    shallowOuter: '#1D6A96', // Coastal Shallow Ring 2
+    shallowInner: '#38A3A5', // Bright Turquoise Coastal Water Ring 1
+    shoreBorder:  '#081C15', // Crisp 1-pixel Dark Shoreline Contour
+    landLow:      '#1B4332', // Pine Coastal Lowlands
+    landMid:      '#2D6A4F', // Mid-Level Forest Green
+    landHigh:     '#40916C', // Vibrant Highland Canopy
+    landPeak:     '#52B788', // Emerald Forest Highlights
+    desertPlat:   '#E07A5F', // Terracotta Plateau
+    desertMid:    '#F4A261', // Warm Golden Amber Desert
+    desertPeak:   '#E9C46A', // Sand Dune Gold
+    icePeak:      '#F8FAFC', // Snow-White Polar Ice
+    iceTrim:      '#BAE6FD', // Glacial Blue Ice Trim
+  };
 
-  const earthMat = new THREE.MeshLambertMaterial({
-    vertexColors: true,
-    flatShading: true
-  });
+  // Render high-craft pixel-art canvas
+  for (let y = 0; y < h; y++) {
+    const lat = 90 - (y / h) * 180;
+    const absLat = Math.abs(lat);
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const type = grid[idx];
+      let color = PALETTE.oceanMid;
 
-  earthMesh = new THREE.Mesh(geo, earthMat);
-  earthMesh.receiveShadow = true;
-  earthGroup.add(earthMesh);
-})();
+      if (type === 0) {
+        // Ocean pixels: Smooth latitude depth bands + crisp turquoise coastal rings
+        const d = dist[idx];
+        if (d === 1) {
+          color = PALETTE.shallowInner; // 1px turquoise shallows
+        } else if (d === 2 || d === 3) {
+          color = PALETTE.shallowOuter; // 2px deeper turquoise
+        } else {
+          color = (absLat < 22 || absLat > 55) ? PALETTE.oceanAbyss : PALETTE.oceanMid;
+        }
+      } else if (type === 3) {
+        // Polar Ice Caps
+        color = (y < 12 || y > h - 12) ? PALETTE.icePeak : PALETTE.iceTrim;
+      } else {
+        // Continental Landmasses (Check for 1px dark shoreline border)
+        let isShoreline = false;
+        for (let dy = -1; dy <= 1; dy++) {
+          const ny = y + dy;
+          if (ny < 0 || ny >= h) continue;
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = (x + dx + w) % w;
+            if (grid[ny * w + nx] === 0) { isShoreline = true; break; }
+          }
+          if (isShoreline) break;
+        }
 
-// Lat/Lon Geodesic Wireframe Overlay (Tactile Rigid Grid)
-const gridGeo = new THREE.IcosahedronGeometry(R_EARTH * 1.015, 3);
+        if (isShoreline) {
+          color = PALETTE.shoreBorder;
+        } else if (type === 2) {
+          if ((x + y) % 5 === 0) color = PALETTE.desertPeak;
+          else if ((x + y) % 3 === 0) color = PALETTE.desertPlat;
+          else color = PALETTE.desertMid;
+        } else {
+          if ((x + y) % 6 === 0) color = PALETTE.landPeak;
+          else if ((x + y) % 4 === 0) color = PALETTE.landHigh;
+          else if ((x + y) % 2 === 0) color = PALETTE.landMid;
+          else color = PALETTE.landLow;
+        }
+      }
+
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Highlight ISRO ISTRAC Bengaluru Ground Station (12.97°N, 77.59°E)
+  const bx = Math.round(((77.59 + 180) / 360) * w);
+  const by = Math.round(((90 - 12.97) / 180) * h);
+  ctx.fillStyle = '#FF4F00';
+  ctx.fillRect(bx - 1, by - 1, 2, 2);
+
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  return tex;
+}
+
+// Continuous, Indexed Watertight Sphere (Zero Cracks, Zero Holes, Zero Gaps Possible)
+const earthTexture = createWatertightPixelEarthTexture();
+const earthGeo = new THREE.SphereGeometry(R_EARTH, 128, 128);
+const earthMat = new THREE.MeshLambertMaterial({
+  map: earthTexture,
+  flatShading: false,
+});
+const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+earthMesh.receiveShadow = true;
+earthGroup.add(earthMesh);
+
+// Subtle Geodesic Coordinate Grid Overlay
+const gridGeo = new THREE.IcosahedronGeometry(R_EARTH * 1.004, 3);
 const gridMat = new THREE.MeshBasicMaterial({
   color: 0x1E4A75,
   wireframe: true,
   transparent: true,
-  opacity: 0.22,
+  opacity: 0.16,
 });
 const gridMesh = new THREE.Mesh(gridGeo, gridMat);
 earthGroup.add(gridMesh);
 
-// Atmosphere Horizon Rim
-const atmGeo = new THREE.SphereGeometry(R_EARTH * 1.026, 64, 64);
+// Thin Atmospheric Glow Rim
+const atmGeo = new THREE.SphereGeometry(R_EARTH * 1.018, 64, 64);
 const atmMat = new THREE.MeshPhongMaterial({
   color: 0x38BDF8,
   transparent: true,
-  opacity: 0.08,
+  opacity: 0.07,
   side: THREE.BackSide,
   depthWrite: false,
 });
@@ -1866,16 +2112,16 @@ earthGroup.add(new THREE.Mesh(atmGeo, atmMat));
 (function buildISTRACMarker() {
   const lat = 12.97 * Math.PI / 180;
   const lon = 77.59 * Math.PI / 180;
-  const r = R_EARTH * 1.028;
+  const r = R_EARTH * 1.014;
   const x = r * Math.cos(lat) * Math.cos(lon);
   const y = r * Math.sin(lat);
   const z = r * Math.cos(lat) * Math.sin(lon);
 
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFF4F00 }));
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFF4F00 }));
   dot.position.set(x, y, z);
   earthGroup.add(dot);
 
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.62, 16), new THREE.MeshBasicMaterial({ color: 0xFF4F00, side: THREE.DoubleSide, transparent: true, opacity: 0.85 }));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.58, 16), new THREE.MeshBasicMaterial({ color: 0xFF4F00, side: THREE.DoubleSide, transparent: true, opacity: 0.85 }));
   ring.position.set(x, y, z);
   ring.lookAt(0, 0, 0);
   earthGroup.add(ring);
@@ -1885,13 +2131,14 @@ earthGroup.add(new THREE.Mesh(atmGeo, atmMat));
    ORBIT RING HELPERS
    ============================================================ */
 function createOrbitRing(radius, inclDeg, color, opacity=0.35) {
+  const safeRadius = Math.max(R_EARTH + 4.5, radius); // Strict physical clearance outside Earth
   const pts = [];
   const incl = inclDeg * Math.PI / 180;
   for (let i = 0; i <= 140; i++) {
     const a = (i / 140) * Math.PI * 2;
-    const x = radius * Math.cos(a);
-    const y = radius * Math.sin(a) * Math.sin(incl);
-    const z = radius * Math.sin(a) * Math.cos(incl);
+    const x = safeRadius * Math.cos(a);
+    const y = safeRadius * Math.sin(a) * Math.sin(incl);
+    const z = safeRadius * Math.sin(a) * Math.cos(incl);
     pts.push(new THREE.Vector3(x, y, z));
   }
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
@@ -2002,7 +2249,7 @@ function spawnDebrisObject(index) {
   const size = DEBRIS_SIZE_MIN + Math.random() * (DEBRIS_SIZE_MAX - DEBRIS_SIZE_MIN);
   const inclDeg = 20 + Math.random() * 145;
   const altOffset = (Math.random() - 0.5) * 3.5;
-  const rOrbit = R_ORBIT + altOffset;
+  const rOrbit = Math.max(R_EARTH + 4.5, R_ORBIT + altOffset); // Strict minimum altitude shell (>= 68.21)
   const speedRatio = 0.80 + Math.random() * 0.40;
   const startAngle = Math.random() * Math.PI * 2;
   const missDist = 0.4 + Math.random() * 7.6;
@@ -2104,11 +2351,22 @@ function getDebrisPosition(d) {
 }
 
 /* ============================================================
-   GOOGLE EARTH GSAP FLY-TO CAMERA ANIMATIONS
+   GOOGLE EARTH GSAP FLY-TO CAMERA ANIMATIONS (OUTWARD SHIELD)
    ============================================================ */
+const MIN_CAM_RADIUS = R_EARTH + 2.8; // 66.51 units: Absolute physical barrier against Earth penetration
+
 function flyToCamera(targetPos, desiredDist = 12, onComplete = null) {
   isFlyingTo = true;
-  _v1.copy(camera.position).sub(targetPos).normalize().multiplyScalar(desiredDist).add(targetPos);
+
+  // Compute Outward Radial Direction from Earth center through targetPos
+  const radialOut = targetPos.clone().normalize();
+  if (radialOut.lengthSq() < 0.001) radialOut.set(0, 1, 0);
+
+  // Desired camera destination ALWAYS sits outward in space relative to Earth
+  const desiredCamPos = targetPos.clone().addScaledVector(radialOut, desiredDist);
+  if (desiredCamPos.length() < MIN_CAM_RADIUS) {
+    desiredCamPos.setLength(MIN_CAM_RADIUS + 2.0);
+  }
 
   if (window.gsap) {
     gsap.killTweensOf(camera.position);
@@ -2122,21 +2380,34 @@ function flyToCamera(targetPos, desiredDist = 12, onComplete = null) {
       ease: "power2.out"
     });
 
-    gsap.to(camera.position, {
-      x: _v1.x,
-      y: _v1.y,
-      z: _v1.z,
+    const startPos = camera.position.clone();
+    const startDist = startPos.length();
+    const endDist = desiredCamPos.length();
+
+    const animObj = { t: 0 };
+    gsap.to(animObj, {
+      t: 1,
       duration: 1.35,
       ease: "power2.inOut",
-      onUpdate: () => controls.update(),
+      onUpdate: () => {
+        const t = animObj.t;
+        // Spherical outward arc: ensures camera arches high above Earth and never penetrates
+        const arcRadius = Math.max(startDist, endDist) + Math.sin(t * Math.PI) * 16.0;
+        camera.position.copy(startPos).lerp(desiredCamPos, t).setLength(Math.max(MIN_CAM_RADIUS, arcRadius));
+        controls.update();
+      },
       onComplete: () => {
+        camera.position.copy(desiredCamPos);
+        if (camera.position.length() < MIN_CAM_RADIUS) camera.position.setLength(MIN_CAM_RADIUS);
+        controls.update();
         isFlyingTo = false;
         if (onComplete) onComplete();
       }
     });
   } else {
     controls.target.copy(targetPos);
-    camera.position.copy(_v1);
+    camera.position.copy(desiredCamPos);
+    if (camera.position.length() < MIN_CAM_RADIUS) camera.position.setLength(MIN_CAM_RADIUS);
     controls.update();
     isFlyingTo = false;
     if (onComplete) onComplete();
@@ -2166,7 +2437,10 @@ function focusObject(mode, idx) {
         x: 0, y: 48, z: 150,
         duration: 1.3,
         ease: "power2.inOut",
-        onUpdate: () => controls.update(),
+        onUpdate: () => {
+          if (camera.position.length() < MIN_CAM_RADIUS) camera.position.setLength(MIN_CAM_RADIUS);
+          controls.update();
+        },
         onComplete: () => { isFlyingTo = false; }
       });
     } else {
@@ -2192,32 +2466,66 @@ function focusObject(mode, idx) {
 }
 
 /* ============================================================
-   TRUE PHYSICAL COLLISION INTERCEPT & IMPACT PHYSICS
+   SINGLE-SHOT PHYSICAL COLLISION INTERCEPT (CURVED ORBITAL ARC)
    ============================================================ */
 function triggerCollisionIntercept() {
   const d = debrisSwarm[activeThreatIdx];
   if (!d) return;
 
-  // 1. Activate intercept state
+  // Hide any previous aftermath modal
+  const modal = document.getElementById('impact-modal-overlay');
+  if (modal) modal.style.display = 'none';
+
+  // 1. Align Asteroid on intersecting orbital arc outside Earth on SAME side as satellite
   interceptState.active = true;
+  interceptState.completed = false;
   interceptState.debris = d;
-  interceptState.startPos.copy(d.mesh.position);
+  interceptState.duration = 3.5;
   interceptState.progress = 0;
-  interceptState.duration = 3.2; // 3.2 second visible intercept trajectory
+
+  // Intercept calculation: Satellite advances by deltaAngle during the 3.5s approach
+  const approachDt = interceptState.duration;
+  const satSpeed = SAT_BASE_SPEED * (paused ? 1.0 : (speedMult > 0 ? speedMult : 1.0));
+  const expectedSatAngle = satAngle + satSpeed * approachDt * 60; // 60fps simulation pace
+
+  // Debris starts 38 degrees ahead on intersecting orbital arc at R_ORBIT
+  interceptState.startAngle = expectedSatAngle + (38 * Math.PI / 180);
+  interceptState.targetAngle = expectedSatAngle;
+
+  interceptState.startIncl = (SAT_INCL + 0.45); // 26° intersecting angle
+  interceptState.targetIncl = SAT_INCL;         // Converges to coplanar at TCA
+
+  d.rOrbit = R_ORBIT;
+  d.inclDeg = interceptState.startIncl * 180 / Math.PI;
+  d.angle = interceptState.startAngle;
+
+  const initialDPos = getOrbitalArcPoint(interceptState.startAngle, interceptState.startIncl, R_ORBIT);
+  d.mesh.position.copy(initialDPos);
 
   // 2. Show countdown banner in topbar
   const banner = document.getElementById('intercept-banner');
   banner.style.display = 'inline-flex';
   document.getElementById('intercept-status-text').textContent = 'COLLISION COURSE LOCKED — IMPACT IN T-00:03...';
 
-  // 3. Smoothly center camera to frame both satellite and incoming debris
+  // 3. Smoothly frame satellite & incoming asteroid with radially outward camera
   cameraMode = 'intercept';
   _v1.addVectors(satGroup.position, d.mesh.position).multiplyScalar(0.5);
-  flyToCamera(_v1, 24);
+  flyToCamera(_v1, 22);
+}
+
+function getOrbitalArcPoint(angle, incl, radius) {
+  const x = radius * Math.cos(angle);
+  const y = radius * Math.sin(angle) * Math.sin(incl);
+  const z = radius * Math.sin(angle) * Math.cos(incl);
+  return new THREE.Vector3(x, y, z);
 }
 
 function executePhysicalImpact(impactPoint) {
+  if (interceptState.completed) return; // Single-Shot Guard: Only fire ONCE
+  interceptState.completed = true;
   interceptState.active = false;
+  interceptState.impactPoint.copy(impactPoint);
+
   document.getElementById('intercept-banner').style.display = 'none';
 
   // Screen shake on 3D viewport
@@ -2231,7 +2539,7 @@ function executePhysicalImpact(impactPoint) {
   const cy = rect.top + rect.height / 2;
 
   const sparkCol = currentTheme === 'mono' ? '#FFFFFF' : '#FF4F00';
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 48; i++) {
     const p = document.createElement('div');
     p.className = 'particle';
     const sz = 4 + Math.random() * 8;
@@ -2239,8 +2547,8 @@ function executePhysicalImpact(impactPoint) {
       width:${sz}px; height:${sz}px;
       left:${cx}px; top:${cy}px;
       background:${sparkCol};
-      --tx:${(Math.random() - 0.5) * 280}px;
-      --ty:${(Math.random() - 0.5) * 280}px;
+      --tx:${(Math.random() - 0.5) * 320}px;
+      --ty:${(Math.random() - 0.5) * 320}px;
       --dur:${0.6 + Math.random() * 0.7}s;
     `;
     document.body.appendChild(p);
@@ -2249,14 +2557,52 @@ function executePhysicalImpact(impactPoint) {
 
   showToast('CRITICAL IMPACT DETECTED — COLLISION AT 0.15 km', 'danger');
 
-  // Respawn debris in a safe non-intercept orbit after 2 seconds
-  setTimeout(() => {
-    if (interceptState.debris) {
-      interceptState.debris.missDistKm = 0.5 + Math.random() * 7.5;
-      interceptState.debris.angle = satAngle + Math.PI;
-      updateActiveThreatSelection();
-    }
-  }, 2200);
+  // Freeze simulation orbital progression upon impact (Single-shot aftermath hold)
+  paused = true;
+  document.getElementById('pause-btn').textContent = 'Resume';
+  document.getElementById('pause-btn').classList.add('active');
+
+  // Display Aftermath Overlay Banner with Replay & AI Dodge options
+  const modal = document.getElementById('impact-modal-overlay');
+  if (modal) {
+    modal.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+// Handler for [ ↺ Replay Impact ]
+function replayCollisionImpact() {
+  const modal = document.getElementById('impact-modal-overlay');
+  if (modal) modal.style.display = 'none';
+  paused = false;
+  document.getElementById('pause-btn').textContent = 'Pause';
+  document.getElementById('pause-btn').classList.remove('active');
+  triggerCollisionIntercept();
+}
+
+// Handler for [ ⚡ Activate Engine 2 AI Dodge ]
+function activateEngine2Dodge() {
+  const modal = document.getElementById('impact-modal-overlay');
+  if (modal) modal.style.display = 'none';
+
+  // Reset debris to a safe stand-off separation
+  if (interceptState.debris) {
+    interceptState.debris.missDistKm = 5.8 + Math.random() * 3.2;
+    interceptState.debris.angle = satAngle + Math.PI * 0.75;
+    interceptState.debris.mesh.position.copy(getDebrisPosition(interceptState.debris));
+    updateActiveThreatSelection();
+  }
+
+  // Resume normal simulation pace
+  paused = false;
+  setSpeed(1.0, document.querySelector('.dock-speed-btn[data-speed="1"]'));
+  document.getElementById('pause-btn').textContent = 'Pause';
+  document.getElementById('pause-btn').classList.remove('active');
+
+  // Run autonomous CAM solver
+  focusObject('sat');
+  runOptimize();
+  showToast('ENGINE 2 AUTONOMOUS CAM ENGAGED — SAFE CLEARANCE RESTORED', 'safe');
 }
 
 /* ============================================================
@@ -2303,13 +2649,17 @@ canvas.addEventListener('click', (e) => {
 });
 
 /* ============================================================
-   CAMERA CHASE & DELTA-TRANSLATION (PRESERVES USER ZOOM)
+   CAMERA CHASE & RADIAL OUTWARD TRACKING (NEVER BLOCKED BY EARTH)
    ============================================================ */
 function updateCameraTarget(satPos) {
   if (isFlyingTo) return;
 
   if (cameraMode === 'global') {
     controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+    // Enforce hard spherical collision floor on camera
+    if (camera.position.length() < MIN_CAM_RADIUS) {
+      camera.position.setLength(MIN_CAM_RADIUS);
+    }
     return;
   }
 
@@ -2317,6 +2667,13 @@ function updateCameraTarget(satPos) {
     if (interceptState.debris) {
       _v1.addVectors(satPos, interceptState.debris.mesh.position).multiplyScalar(0.5);
       controls.target.lerp(_v1, 0.12);
+
+      // Radially outward camera offset from midpoint
+      const midOut = _v1.clone().normalize();
+      const desiredCam = _v1.clone().addScaledVector(midOut, 18.0);
+      if (desiredCam.length() < MIN_CAM_RADIUS) desiredCam.setLength(MIN_CAM_RADIUS + 2.0);
+      camera.position.lerp(desiredCam, 0.08);
+      if (camera.position.length() < MIN_CAM_RADIUS) camera.position.setLength(MIN_CAM_RADIUS);
     }
     return;
   }
@@ -2330,13 +2687,26 @@ function updateCameraTarget(satPos) {
     else { cameraMode = 'global'; return; }
   }
 
-  _v1.copy(goalPos).sub(controls.target);
-  camera.position.add(_v1.multiplyScalar(0.09));
-  controls.target.lerp(goalPos, 0.09);
+  // Outward radial camera chase: Earth is ALWAYS beneath the object and NEVER blocks line of sight
+  const radialOut = goalPos.clone().normalize();
+  const tangent = new THREE.Vector3(-radialOut.z, 0, radialOut.x).normalize();
+  const desiredCam = goalPos.clone().addScaledVector(radialOut, 5.5).addScaledVector(tangent, -4.0);
+
+  if (desiredCam.length() < MIN_CAM_RADIUS) {
+    desiredCam.setLength(MIN_CAM_RADIUS + 2.0);
+  }
+
+  controls.target.lerp(goalPos, 0.10);
+  camera.position.lerp(desiredCam, 0.08);
+
+  // Hard physical floor on camera radius in every frame
+  if (camera.position.length() < MIN_CAM_RADIUS) {
+    camera.position.setLength(MIN_CAM_RADIUS);
+  }
 }
 
 /* ============================================================
-   SIMULATION ANIMATION LOOP
+   SIMULATION ANIMATION LOOP (SOLID EARTH & SINGLE-SHOT COLLISION)
    ============================================================ */
 let lastFrameTime = performance.now();
 
@@ -2362,9 +2732,11 @@ function animate() {
     earthGroup.rotation.y += 0.00025 * speedMult;
   }
 
-  // 2. Satellite Position
+  // 2. Satellite Position (Always strictly outside Earth floor)
   const satPos = getSatPosition(satAngle);
+  if (satPos.length() < R_EARTH + 2.0) satPos.setLength(R_ORBIT);
   satGroup.position.copy(satPos);
+
   _v2.set(
     Math.cos(satAngle + 0.01),
     Math.sin(satAngle + 0.01) * Math.sin(SAT_INCL),
@@ -2393,18 +2765,23 @@ function animate() {
   debrisSwarm.forEach((d) => {
     // If this debris is on an active intercept collision course:
     if (interceptState.active && interceptState.debris === d) {
-      interceptState.progress += (dt / interceptState.duration);
+      interceptState.progress += (rawDt / interceptState.duration);
       const remainingSec = Math.max(0, Math.ceil((1 - interceptState.progress) * interceptState.duration));
       document.getElementById('intercept-status-text').textContent = `COLLISION COURSE LOCKED — IMPACT IN T-00:0${remainingSec}...`;
 
-      // Live physical trajectory straight toward the satellite's moving position
-      d.mesh.position.lerpVectors(interceptState.startPos, satGroup.position, Math.min(1, interceptState.progress));
+      const t = Math.min(1.0, interceptState.progress);
+      // Interpolate along external spherical orbital arc at R_ORBIT (never cuts through Earth!)
+      const curAngle = interceptState.startAngle + (interceptState.targetAngle - interceptState.startAngle) * t;
+      const curIncl = interceptState.startIncl + (interceptState.targetIncl - interceptState.startIncl) * t;
+      const arcPos = getOrbitalArcPoint(curAngle, curIncl, R_ORBIT);
+
+      d.mesh.position.copy(arcPos);
       d.mesh.rotateX(0.04);
       d.mesh.rotateZ(0.04);
 
       // Check for physical contact
       const physicalDist = d.mesh.position.distanceTo(satGroup.position);
-      if (physicalDist < 1.2 || interceptState.progress >= 0.98) {
+      if (physicalDist < 1.2 || t >= 0.99) {
         executePhysicalImpact(satGroup.position);
       }
     } else if (!paused) {
@@ -2415,6 +2792,11 @@ function animate() {
       d.mesh.rotateZ(d.tumbleZ * speedMult);
       const dPos = getDebrisPosition(d);
       d.mesh.position.copy(dPos);
+    }
+
+    // Hard physical floor on all debris particles
+    if (d.mesh.position.length() < R_EARTH + 2.0) {
+      d.mesh.position.setLength(R_EARTH + 4.8);
     }
 
     // Far-Side Occlusion for each debris beacon
@@ -2435,7 +2817,7 @@ function animate() {
   renderSwarmList();
   renderActiveThreatTelemetry();
 
-  // Camera Tracking & Smooth Zoom
+  // Camera Tracking & Smooth Zoom (Outward radial orientation)
   updateCameraTarget(satPos);
 
   // Orbit & Grid Visibility
@@ -2443,8 +2825,8 @@ function animate() {
   gridMesh.visible = tweaks.grid;
   satBeacon.visible = tweaks.beacons;
   debrisSwarm.forEach(d => { d.beacon.visible = tweaks.beacons; });
-  if (milkyWayMesh) milkyWayMesh.visible = tweaks.milky;
-  if (nebulaClustersMesh) nebulaClustersMesh.visible = tweaks.milky;
+  if (milkyWayDustMesh) milkyWayDustMesh.visible = tweaks.milky;
+  if (milkyWayCloudsGroup) milkyWayCloudsGroup.visible = tweaks.milky;
 
   // Update Clock Dock
   document.getElementById('dock-clock-val').textContent = formatMET(simMET);
@@ -2454,6 +2836,11 @@ function animate() {
   if (tweaks.auto && !paused && (now - lastOptimizeTime > 6000)) {
     lastOptimizeTime = now;
     runOptimize();
+  }
+
+  // Hard camera floor enforcement
+  if (camera.position.length() < MIN_CAM_RADIUS) {
+    camera.position.setLength(MIN_CAM_RADIUS);
   }
 
   controls.update();
@@ -2793,8 +3180,8 @@ function toggleTweak(k, btn) {
   btn.classList.toggle('on', tweaks[k]);
   if (k === 'auto') autoOptimize = tweaks[k];
   if (k === 'milky') {
-    if (milkyWayMesh) milkyWayMesh.visible = tweaks[k];
-    if (nebulaClustersMesh) nebulaClustersMesh.visible = tweaks[k];
+    if (milkyWayDustMesh) milkyWayDustMesh.visible = tweaks[k];
+    if (milkyWayCloudsGroup) milkyWayCloudsGroup.visible = tweaks[k];
   }
 }
 
