@@ -1626,7 +1626,7 @@
    CONSTANTS & MISSION STATE
    ============================================================ */
 const R_EARTH = 63.71;
-const R_ORBIT = 70.0; // Clearly elevated LEO orbit ring above Earth (63.71)
+const R_ORBIT = 68.8; // Real Cartosat-3 at 509km: (6371+509)/100 = 68.8
 const SAT_SIZE = 0.35;
 const DEBRIS_SIZE_MIN = 0.20;
 const DEBRIS_SIZE_MAX = 0.42;
@@ -2169,6 +2169,42 @@ function initSwarm(count = 7) {
 }
 initSwarm(7);
 
+// Fetch real CelesTrak orbital data and update debris parameters
+async function fetchRealDebrisCatalog() {
+  try {
+    const resp = await fetch('/api/v1/live/debris-catalog');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.debris || !data.debris.length) return;
+    // Update satellite constants from real data
+    if (data.satellite) {
+      // R_ORBIT_REAL is 68.8 for Cartosat-3 at 509km
+      // We keep the visual R_ORBIT for display but update inclination
+      const realIncl = (data.satellite.inclDeg || 97.4) * Math.PI / 180;
+      window._realSatIncl = realIncl;
+    }
+    // Update debris swarm with real orbital data
+    data.debris.forEach((realDeb, i) => {
+      if (i < debrisSwarm.length) {
+        debrisSwarm[i].name = realDeb.name;
+        debrisSwarm[i].inclDeg = realDeb.inclDeg;
+        debrisSwarm[i].rOrbit = Math.min(Math.max(realDeb.rOrbit_3D || R_ORBIT, R_EARTH + 5.0), R_ORBIT + 8.0);
+        debrisSwarm[i].speedRatio = realDeb.speedRatio || 1.0;
+        debrisSwarm[i].missDistKm = realDeb.missDistKm;
+        if (debrisSwarm[i].label) debrisSwarm[i].label.textContent = realDeb.name;
+      }
+    });
+    console.log('[QuantumOrbit] Real TLE data loaded from CelesTrak:', data.source);
+    // Refresh threat display
+    updateThreatOrbitRing && updateThreatOrbitRing();
+    updateDebrisList && updateDebrisList();
+  } catch(e) {
+    console.warn('[QuantumOrbit] Real data fetch failed, using synthetic fallback:', e.message);
+  }
+}
+fetchRealDebrisCatalog();
+setInterval(fetchRealDebrisCatalog, 60000);
+
 function adjustSwarmCount(delta) {
   const currentCount = debrisSwarm.length;
   const newCount = Math.max(5, Math.min(30, currentCount + delta));
@@ -2208,7 +2244,7 @@ function updateActiveThreatSelection() {
    ORBITAL GEOMETRY & CALCULATIONS
    ============================================================ */
 let satAngle = 0;
-const SAT_INCL = 32 * Math.PI / 180;
+const SAT_INCL = 97.4 * Math.PI / 180; // Real Cartosat-3: sun-synchronous 97.4°
 const SAT_BASE_SPEED = 0.00175; // Halved default orbital speed for smooth, watchable motion
 
 function getSatPosition(angle) {
