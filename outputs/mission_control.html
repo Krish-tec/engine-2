@@ -605,112 +605,256 @@
     .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s var(--easing); }
     [data-theme="mono"] .progress-fill { background: #FFFFFF; }
 
-    /* Sliders */
-    .slider-row { margin-bottom: 12px; }
-    .slider-row label { font-size: 11px; color: var(--text-3); display: flex; justify-content: space-between; margin-bottom: 6px; }
-    .slider-row label span { color: var(--text-1); font-weight: 700; }
-    input[type=range] {
-      -webkit-appearance: none;
-      width: 100%; height: 4px;
-      background: var(--surface-3);
-      border-radius: 2px; outline: none; cursor: pointer;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px; height: 14px;
-      border-radius: 50%;
-      background: var(--btn-pri-bg);
-      cursor: grab;
-      transition: transform 100ms;
-    }
-    input[type=range]::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.25); }
-
-    /* Optimize Button */
-    .btn-optimize {
+    /* PLAIN-ENGLISH SIDEBAR STYLING */
+    .plain-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: var(--r-sm);
       width: 100%;
-      padding: 10px 16px;
-      background: var(--btn-pri-bg);
-      color: var(--btn-pri-fg);
+      margin-bottom: 10px;
+      transition: all 0.2s ease;
+    }
+    .plain-status-badge.warning {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-ring);
+      color: var(--accent);
+    }
+    .plain-status-badge.safe {
+      background: var(--safe-dim);
+      border: 1px solid var(--safe-ring);
+      color: var(--safe);
+    }
+    [data-theme="mono"] .plain-status-badge.warning,
+    [data-theme="mono"] .plain-status-badge.safe {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: #FFFFFF;
+      color: #FFFFFF;
+    }
+    .plain-status-badge svg {
+      width: 14px; height: 14px; flex-shrink: 0;
+    }
+
+    .plain-data-table {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .plain-data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11.5px;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .plain-data-row:last-child {
+      border-bottom: none;
+    }
+    .plain-label {
+      color: var(--text-3);
+      font-size: 11px;
+    }
+    .plain-value {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-1);
+    }
+    .plain-value.primary {
+      color: #3B82F6;
+    }
+    .plain-value.bold {
+      font-weight: 700;
+    }
+    .plain-value.danger {
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .plain-value.safe {
+      color: var(--safe);
+      font-weight: 700;
+    }
+    [data-theme="mono"] .plain-value.primary,
+    [data-theme="mono"] .plain-value.danger,
+    [data-theme="mono"] .plain-value.safe {
+      color: #FFFFFF;
+    }
+    .plain-subtext {
+      font-size: 10px;
+      color: var(--text-3);
+      margin-top: -3px;
+      font-style: italic;
+    }
+
+    /* Card 2: Plan */
+    .plain-plan-header {
+      margin-bottom: 8px;
+    }
+    .plain-action-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--safe);
+      background: var(--safe-dim);
+      border: 1px solid var(--safe-ring);
+      padding: 5px 9px;
+      border-radius: var(--r-sm);
+      width: 100%;
+    }
+    [data-theme="mono"] .plain-action-pill {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: #FFFFFF;
+      color: #FFFFFF;
+    }
+    .plain-action-pill svg {
+      width: 13px; height: 13px; flex-shrink: 0;
+    }
+    .plain-plan-desc {
+      font-size: 11.5px;
+      color: var(--text-2);
+      line-height: 1.45;
+      margin: 0 0 10px 0;
+    }
+    .plain-compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .plain-compare-box {
+      border-radius: var(--r-sm);
+      padding: 8px 10px;
+      text-align: center;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .plain-compare-box.danger-box {
+      border-color: var(--accent-ring);
+      background: var(--accent-dim);
+    }
+    .plain-compare-box.safe-box {
+      border-color: var(--safe-ring);
+      background: var(--safe-dim);
+    }
+    [data-theme="mono"] .plain-compare-box.danger-box,
+    [data-theme="mono"] .plain-compare-box.safe-box {
+      border-color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .plain-compare-lbl {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-3);
+      margin-bottom: 3px;
+    }
+    .plain-compare-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-1);
+    }
+    .danger-box .plain-compare-val {
+      color: var(--accent);
+    }
+    .safe-box .plain-compare-val {
+      color: var(--safe);
+    }
+    [data-theme="mono"] .danger-box .plain-compare-val,
+    [data-theme="mono"] .safe-box .plain-compare-val {
+      color: #FFFFFF;
+    }
+    .plain-compare-sub {
+      font-size: 9px;
+      color: var(--text-3);
+      margin-top: 2px;
+    }
+    .plain-fuel-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-2);
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .plain-fuel-row svg {
+      width: 13px; height: 13px; color: var(--safe);
+    }
+    [data-theme="mono"] .plain-fuel-row svg {
+      color: #FFFFFF;
+    }
+
+    /* Card 3: Action Buttons */
+    .plain-actions-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn-plain-dodge {
+      width: 100%;
+      padding: 11px 16px;
+      background: var(--safe);
+      color: #FFFFFF;
       border: none;
       border-radius: var(--r-md);
       font-size: 13px;
       font-weight: 700;
-      letter-spacing: -0.01em;
       cursor: pointer;
-      transition: background 150ms, transform 80ms;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
     }
-    .btn-optimize svg { width: 15px; height: 15px; stroke-width: 2.2; }
-    .btn-optimize:hover { background: var(--btn-pri-hover); }
-    .btn-optimize:active { transform: scale(0.98); }
-    .btn-optimize:disabled { background: var(--surface-3); color: var(--text-3); cursor: not-allowed; transform: none; }
-
-    /* Secondary Action (Simulate Impact) */
-    .btn-impact {
+    .btn-plain-dodge:hover {
+      background: #059669;
+      transform: translateY(-1px);
+    }
+    .btn-plain-dodge:active {
+      transform: translateY(0);
+    }
+    [data-theme="mono"] .btn-plain-dodge {
+      background: #FFFFFF;
+      color: #000000;
+      box-shadow: none;
+    }
+    .btn-plain-crash {
       width: 100%;
-      padding: 7px 12px;
+      padding: 9px 14px;
       background: transparent;
       border: 1px solid var(--border-hard);
       border-radius: var(--r-sm);
-      font-size: 11.5px;
+      font-size: 12px;
       font-weight: 600;
-      color: var(--text-3);
+      color: var(--text-2);
       cursor: pointer;
-      margin-top: 8px;
-      transition: all 150ms ease;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s ease;
     }
-    .btn-impact svg { width: 13px; height: 13px; }
-    .btn-impact:hover {
-      border-color: var(--accent-ring);
+    .btn-plain-crash:hover {
+      border-color: var(--accent);
       color: var(--accent);
       background: var(--accent-dim);
     }
-    [data-theme="mono"] .btn-impact:hover {
+    [data-theme="mono"] .btn-plain-crash:hover {
       border-color: #FFFFFF;
       color: #FFFFFF;
       background: rgba(255, 255, 255, 0.1);
     }
-
-    /* Result Comparison */
-    .compare-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      margin-top: 8px;
-    }
-    .compare-cell {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      padding: 8px 10px;
-      text-align: center;
-    }
-    .compare-cell-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 4px; }
-    .compare-cell-val { font-size: 15px; font-weight: 700; color: var(--text-1); }
-    .compare-cell-val.danger { color: var(--accent); }
-    .compare-cell-val.safe   { color: var(--safe); }
-    .compare-cell-unit { font-size: 9px; color: var(--text-3); margin-top: 1px; }
-
-    /* Strategy Badge */
-    .strategy-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 5px 10px;
-      border-radius: 20px;
-      font-size: 10px; font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      background: var(--safe-dim);
-      border: 1px solid var(--safe-ring);
-      color: var(--safe);
-      margin-top: 8px;
-    }
-    .strategy-badge svg { width: 12px; height: 12px; }
-    [data-theme="mono"] .strategy-badge {
-      background: #FFFFFF;
-      color: #000000;
-      border-color: #FFFFFF;
+    .junk-list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
     }
 
     /* Dodged Counter */
@@ -1176,32 +1320,95 @@
        ========================================================================= -->
   <aside id="sidebar">
 
-    <!-- STEP 1: Threat Detection -->
+    <!-- CARD 1: LIVE ORBIT STATUS -->
     <div class="sidebar-section">
       <div class="section-label-row">
-        <div class="section-label">Step 01 — Threat Detection</div>
+        <div class="section-label">Live Orbit Status</div>
       </div>
-      <div class="step-card" id="card-threat">
-        <div class="step-num">Active Conjunction</div>
-        <div class="step-title" id="threat-name-display">COSMOS-1408 Frag</div>
-        <div class="tele-row"><span class="tele-label">TCA Window</span><span class="tele-value" id="tele-tca">T-02:34:12</span></div>
-        <div class="tele-row"><span class="tele-label">Pre-CAM Miss Distance</span><span class="tele-value danger" id="tele-miss-pre">1.24 km</span></div>
-        <div class="tele-row"><span class="tele-label">Collision Prob Pc</span><span class="tele-value danger" id="tele-pc-pre">3.20 × 10⁻³</span></div>
-        <div class="tele-row"><span class="tele-label">Relative Velocity</span><span class="tele-value neutral" id="tele-relv">11.4 km/s</span></div>
-        <div class="progress-wrap">
-          <div class="progress-label">
-            <span>Encounter Proximity</span>
-            <span id="progress-pct" class="num-tabular">78%</span>
+      <div class="step-card plain-status-card" id="card-orbit-status">
+        <div class="status-badge-wrap">
+          <div id="plain-status-badge" class="plain-status-badge warning">
+            <i data-lucide="alert-triangle"></i>
+            <span>⚠️ Warning: Space Debris Approaching</span>
           </div>
-          <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:78%"></div></div>
+        </div>
+        <div class="plain-data-table">
+          <div class="plain-data-row">
+            <span class="plain-label">Our Satellite</span>
+            <span class="plain-value primary">ISRO Cartosat-3</span>
+          </div>
+          <div class="plain-data-row">
+            <span class="plain-label">Closest Space Junk</span>
+            <span class="plain-value bold" id="plain-junk-name">COSMOS-1408 Frag</span>
+          </div>
+          <div class="plain-data-row">
+            <span class="plain-label">Distance Without Dodge</span>
+            <span class="plain-value danger" id="plain-live-dist">1.23 km (Danger)</span>
+          </div>
+          <div class="plain-subtext">Must maintain &gt; 5.00 km safety clearance</div>
+          <div class="plain-data-row" style="margin-top:6px;">
+            <span class="plain-label">Time Until Pass</span>
+            <span class="plain-value num-tabular" id="plain-time-pass">42 sec</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Active Swarm Queue with Dynamic Count Adjuster -->
+    <!-- CARD 2: ENGINE 2 AUTO-DODGE PLAN -->
     <div class="sidebar-section">
       <div class="section-label-row">
-        <div class="section-label">Debris Swarm (<span id="swarm-count-badge">7</span>)</div>
+        <div class="section-label">Engine 2 Auto-Dodge Plan</div>
+      </div>
+      <div class="step-card plain-plan-card" id="card-dodge-plan">
+        <div class="plain-plan-header">
+          <div class="plain-action-pill">
+            <i data-lucide="zap"></i>
+            <span id="plain-plan-action">Speed Up Slightly (+0.42 m/s Forward)</span>
+          </div>
+        </div>
+        <p class="plain-plan-desc" id="plain-plan-desc">
+          A tiny forward thruster push early lets our satellite pass safely ahead of the space junk.
+        </p>
+
+        <div class="plain-compare-grid">
+          <div class="plain-compare-box danger-box">
+            <div class="plain-compare-lbl">Without Dodge</div>
+            <div class="plain-compare-val" id="plain-compare-before">1.23 km</div>
+            <div class="plain-compare-sub">Collision Danger</div>
+          </div>
+          <div class="plain-compare-box safe-box">
+            <div class="plain-compare-lbl">With Engine 2 AI</div>
+            <div class="plain-compare-val" id="plain-compare-after">8.76 km Safe ✓</div>
+            <div class="plain-compare-sub">Clean Clearance</div>
+          </div>
+        </div>
+
+        <div class="plain-fuel-row">
+          <i data-lucide="fuel"></i>
+          <span>Fuel Used: <strong id="plain-plan-fuel">Only 0.42 m/s</strong> (Saves 75% fuel)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 3: TEST SCENARIOS & SPACE JUNK LIST -->
+    <div class="sidebar-section">
+      <div class="section-label-row">
+        <div class="section-label">Test Scenarios</div>
+      </div>
+      <div class="plain-actions-group">
+        <button class="btn-plain-dodge" id="btn-plain-dodge" onclick="triggerAISafeDodge()">
+          <i data-lucide="shield-check"></i>
+          <span>⚡ Trigger AI Safe Dodge</span>
+        </button>
+        <button class="btn-plain-crash" id="btn-plain-crash" onclick="triggerCollisionIntercept()">
+          <i data-lucide="alert-octagon"></i>
+          <span>💥 Turn Off AI (Watch Crash)</span>
+        </button>
+      </div>
+
+      <!-- SPACE JUNK IN ORBIT (Live updating distances) -->
+      <div class="junk-list-header" style="margin-top:16px;">
+        <div class="section-label">Space Junk in Orbit (<span id="swarm-count-badge">7</span>)</div>
         <div class="swarm-counter-ctrl">
           <button class="swarm-btn" onclick="adjustSwarmCount(-1)" title="Remove debris object">−</button>
           <span class="swarm-count-val num-tabular" id="swarm-count-val">7</span>
@@ -1211,71 +1418,7 @@
       <div id="swarm-list"></div>
     </div>
 
-    <!-- STEP 2: AI Decision -->
-    <div class="sidebar-section">
-      <div class="section-label-row">
-        <div class="section-label">Step 02 — AI Maneuver Decision</div>
-      </div>
-
-      <div class="slider-row">
-        <label>Time to TCA <span id="tca-h-label" class="num-tabular">2.5 h</span></label>
-        <input type="range" id="sl-tca" min="0.5" max="12" step="0.5" value="2.5">
-      </div>
-      <div class="slider-row">
-        <label>Predicted Miss Dist <span id="miss-pre-label" class="num-tabular">1.24 km</span></label>
-        <input type="range" id="sl-miss" min="0.1" max="8" step="0.05" value="1.24">
-      </div>
-
-      <button class="btn-optimize" id="btn-opt" onclick="runOptimize()">
-        <i data-lucide="zap"></i>
-        Compute Optimal CAM
-      </button>
-
-      <button class="btn-impact" onclick="triggerCollisionIntercept()" title="Trigger true physical intercept & collision">
-        <i data-lucide="flame"></i>
-        Simulate Critical Impact (&lt; 0.2 km)
-      </button>
-    </div>
-
-    <!-- STEP 3: Result -->
-    <div class="sidebar-section">
-      <div class="section-label-row">
-        <div class="section-label">Step 03 — Before / After Result</div>
-      </div>
-      <div class="compare-grid">
-        <div class="compare-cell">
-          <div class="compare-cell-label">Before</div>
-          <div class="compare-cell-val danger" id="res-before-miss">1.24</div>
-          <div class="compare-cell-unit">km miss dist</div>
-        </div>
-        <div class="compare-cell">
-          <div class="compare-cell-label">After CAM</div>
-          <div class="compare-cell-val safe" id="res-after-miss">—</div>
-          <div class="compare-cell-unit">km miss dist</div>
-        </div>
-        <div class="compare-cell">
-          <div class="compare-cell-label">Pc Before</div>
-          <div class="compare-cell-val danger" id="res-pc-before">3.20e-3</div>
-          <div class="compare-cell-unit">probability</div>
-        </div>
-        <div class="compare-cell">
-          <div class="compare-cell-label">Pc After</div>
-          <div class="compare-cell-val safe" id="res-pc-after">—</div>
-          <div class="compare-cell-unit">probability</div>
-        </div>
-      </div>
-      <div id="strategy-display" style="display:none">
-        <div class="strategy-badge">
-          <i data-lucide="check-circle-2"></i>
-          <span id="strategy-text">Hybrid Radial Emergency</span>
-        </div>
-        <div class="tele-row" style="margin-top:8px"><span class="tele-label">Delta-V Burn</span><span class="tele-value safe" id="res-dv">5.00 m/s</span></div>
-        <div class="tele-row"><span class="tele-label">Burn Duration</span><span class="tele-value neutral" id="res-dur">12.0 s</span></div>
-        <div class="tele-row"><span class="tele-label">Remaining Fuel Budget</span><span class="tele-value neutral" id="res-fuel">0.00 m/s</span></div>
-      </div>
-    </div>
-
-    <!-- Dodged Counter -->
+    <!-- Mission Score Avoided Counter -->
     <div class="sidebar-section">
       <div class="section-label-row">
         <div class="section-label">Mission Score</div>
@@ -1470,16 +1613,8 @@
     <button class="tweaks-toggle on" id="twk-beacons" onclick="toggleTweak('beacons', this)"></button>
   </div>
   <div class="tweaks-row">
-    <span>Lat/Lon Geodesic Grid</span>
-    <button class="tweaks-toggle on" id="twk-grid" onclick="toggleTweak('grid', this)"></button>
-  </div>
-  <div class="tweaks-row">
     <span>Auto-Maneuver Agent</span>
     <button class="tweaks-toggle" id="twk-auto" onclick="toggleTweak('auto', this)"></button>
-  </div>
-  <div class="tweaks-row">
-    <span>Milky Way Galaxy Band</span>
-    <button class="tweaks-toggle on" id="twk-milky" onclick="toggleTweak('milky', this)"></button>
   </div>
 </div>
 
@@ -1491,14 +1626,14 @@
    CONSTANTS & MISSION STATE
    ============================================================ */
 const R_EARTH = 63.71;
-const R_ORBIT = 68.78;
+const R_ORBIT = 70.0; // Clearly elevated LEO orbit ring above Earth (63.71)
 const SAT_SIZE = 0.35;
 const DEBRIS_SIZE_MIN = 0.20;
 const DEBRIS_SIZE_MAX = 0.42;
 const SAFETY_KM = 5.0;
 
 // Tweaks
-const tweaks = { orbits: true, beacons: true, grid: true, auto: false, milky: true };
+const tweaks = { orbits: true, beacons: true, auto: false };
 
 // Active Theme: 'dark' | 'light' | 'mono'
 let currentTheme = 'dark';
@@ -1656,25 +1791,22 @@ function isBehindEarth(camPos, objPos) {
 }
 
 /* ============================================================
-   DEEP SPACE: 360° OMNIDIRECTIONAL STARFIELD + ONE-SECTOR NEBULA MILKY WAY
+   DEEP SPACE: CALM REALISTIC 360° STARS ONLY (NO GALAXY)
    ============================================================ */
-let stars360Mesh, milkyWayDustMesh, milkyWayCloudsGroup;
+let stars360Mesh;
 
-// 1. FULL 360-DEGREE OMNIDIRECTIONAL CELESTIAL SPHERE STARFIELD
+// Clean, subtle, realistic 360° celestial sphere starfield (2,500 stars, calm starlight)
 (function build360OmnidirectionalStarfield() {
-  const starCount = 3600;
+  const starCount = 2500;
   const positions = new Float32Array(starCount * 3);
   const colors = new Float32Array(starCount * 3);
 
-  // Stellar spectral distribution colors (O, B, A, F, G, K, M)
+  // Subtle natural starlight palette (pure white, soft blue-white, warm cream)
   const starColors = [
-    new THREE.Color(0xFFFFFF), // Class A: Pure White (Vega/Sirius)
-    new THREE.Color(0xF0F4FF), // Class B: Blue-White (Rigel)
-    new THREE.Color(0xD9E8FF), // Class O: Electric Deep Blue
-    new THREE.Color(0xFFF4E8), // Class F: Warm Cream White (Procyon)
-    new THREE.Color(0xFFE4A0), // Class G: Golden Yellow (Sun/Capella)
-    new THREE.Color(0xFFB060), // Class K: Soft Orange (Arcturus)
-    new THREE.Color(0xFF6B4A), // Class M: Rich Red-Orange (Betelgeuse)
+    new THREE.Color(0xFFFFFF), // Pure white
+    new THREE.Color(0xF0F4FF), // Blue-white
+    new THREE.Color(0xFFF9F0), // Warm cream
+    new THREE.Color(0xE2ECFF), // Soft icy blue
   ];
 
   const tempCol = new THREE.Color();
@@ -1683,23 +1815,20 @@ let stars360Mesh, milkyWayDustMesh, milkyWayCloudsGroup;
     // Uniform random distribution over full 4*PI steradian 360-degree sphere
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const r = 850 + Math.random() * 200;
+    const r = 900 + (Math.random() - 0.5) * 80;
 
     positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
     positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
     positions[i * 3 + 2] = r * Math.cos(phi);
 
-    // Pick spectral star color with realistic distribution
+    // Pick subtle color
     const p = Math.random();
-    if (p < 0.44) tempCol.copy(starColors[0]);
-    else if (p < 0.67) tempCol.copy(starColors[1]);
-    else if (p < 0.81) tempCol.copy(starColors[3]);
-    else if (p < 0.90) tempCol.copy(starColors[4]);
+    if (p < 0.60) tempCol.copy(starColors[0]);
+    else if (p < 0.85) tempCol.copy(starColors[1]);
     else if (p < 0.95) tempCol.copy(starColors[2]);
-    else if (p < 0.982) tempCol.copy(starColors[5]);
-    else tempCol.copy(starColors[6]);
+    else tempCol.copy(starColors[3]);
 
-    const lum = 0.55 + Math.random() * 0.45;
+    const lum = 0.50 + Math.random() * 0.40;
     colors[i * 3]     = tempCol.r * lum;
     colors[i * 3 + 1] = tempCol.g * lum;
     colors[i * 3 + 2] = tempCol.b * lum;
@@ -1710,10 +1839,10 @@ let stars360Mesh, milkyWayDustMesh, milkyWayCloudsGroup;
   starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const starMat = new THREE.PointsMaterial({
-    size: 2.2,
+    size: 2.0,
     vertexColors: true,
     transparent: true,
-    opacity: 0.92,
+    opacity: 0.70,
     sizeAttenuation: false
   });
 
@@ -1721,185 +1850,8 @@ let stars360Mesh, milkyWayDustMesh, milkyWayCloudsGroup;
   scene.add(stars360Mesh);
 })();
 
-// 2. DIRECTIONAL ONE-SECTOR NEBULA MILKY WAY (110° SKY ARC BEHIND EARTH)
-(function buildOneSectorNebulaMilkyWay() {
-  // Center of localized Galactic Core in sky hemisphere behind Earth
-  const coreDir = new THREE.Vector3(-0.65, 0.35, -0.68).normalize();
-
-  // Create an orthonormal coordinate frame for the galactic plane
-  const galUp = new THREE.Vector3(0.35, 0.92, -0.15).normalize();
-  const galRight = new THREE.Vector3().crossVectors(galUp, coreDir).normalize();
-  const galNormal = new THREE.Vector3().crossVectors(coreDir, galRight).normalize();
-
-  // A. Generate Soft Pixel-Art Stepped Nebula Cloud Sprite Texture (256x256)
-  function createNebulaCloudSprite() {
-    const cSize = 256;
-    const cvs = document.createElement('canvas');
-    cvs.width = cSize; cvs.height = cSize;
-    const ctx = cvs.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
-
-    // Stepped pixel-art radial density with subtle fractal dithering
-    const half = cSize / 2;
-    for (let y = 0; y < cSize; y += 4) {
-      for (let x = 0; x < cSize; x += 4) {
-        const dx = (x + 2 - half) / half;
-        const dy = (y + 2 - half) / half;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < 1.0) {
-          let alpha = Math.pow(1.0 - d, 1.85);
-          if (((x / 4) + (y / 4)) % 2 === 0) alpha *= 0.92;
-          const aByte = Math.max(0, Math.min(255, Math.floor(alpha * 255)));
-          ctx.fillStyle = `rgba(255, 255, 255, ${aByte / 255})`;
-          ctx.fillRect(x, y, 4, 4);
-        }
-      }
-    }
-    const tex = new THREE.CanvasTexture(cvs);
-    tex.magFilter = THREE.NearestFilter;
-    tex.minFilter = THREE.NearestFilter;
-    tex.generateMipmaps = false;
-    return tex;
-  }
-
-  const nebulaTex = createNebulaCloudSprite();
-  milkyWayCloudsGroup = new THREE.Group();
-  scene.add(milkyWayCloudsGroup);
-
-  // B. 180 Overlapping Soft-Glowing Nebula Sprite Clouds in Localized 110° Arc
-  const cloudCount = 180;
-  const cloudColors = [
-    new THREE.Color(0xFFD166), // Warm Peach-Gold (Galactic Core Center)
-    new THREE.Color(0xFFF3B0), // Incandescent Cream
-    new THREE.Color(0xF4A261), // Fiery Amber-Orange
-    new THREE.Color(0xE07A5F), // Dusty Terracotta Rose
-    new THREE.Color(0xB56576), // Rich H-Alpha Magenta
-    new THREE.Color(0x6D597A), // Deep Cosmic Violet-Indigo
-    new THREE.Color(0x355070), // Stellar Midnight Blue
-    new THREE.Color(0x4EA8DE), // Soft Ionized Cyan
-  ];
-
-  for (let i = 0; i < cloudCount; i++) {
-    // Angular span strictly along ±55° arc in longitude
-    const u = (Math.random() - 0.5) * 1.8; // ~ ±52 degrees along galactic spine
-    const distFromCore = Math.abs(u);
-
-    // Tilted diagonal thickness along galactic latitude
-    const v = (Math.random() - 0.5) * (0.28 + distFromCore * 0.35);
-    const r = 780 + Math.random() * 80;
-
-    const dir = new THREE.Vector3()
-      .copy(coreDir)
-      .addScaledVector(galRight, u)
-      .addScaledVector(galNormal, v)
-      .normalize();
-
-    const pos = dir.clone().multiplyScalar(r);
-
-    let col;
-    if (distFromCore < 0.35) {
-      const p = Math.random();
-      col = (p < 0.45) ? cloudColors[0] : (p < 0.75 ? cloudColors[1] : cloudColors[2]);
-    } else if (distFromCore < 0.65) {
-      const p = Math.random();
-      col = (p < 0.5) ? cloudColors[3] : cloudColors[4];
-    } else {
-      const p = Math.random();
-      col = (p < 0.4) ? cloudColors[5] : (p < 0.75 ? cloudColors[6] : cloudColors[7]);
-    }
-
-    const mat = new THREE.SpriteMaterial({
-      map: nebulaTex,
-      color: col,
-      transparent: true,
-      opacity: 0.08 + Math.random() * 0.10,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    const sprite = new THREE.Sprite(mat);
-    sprite.position.copy(pos);
-    const scale = 75 + Math.random() * 95;
-    sprite.scale.set(scale, scale, 1);
-    milkyWayCloudsGroup.add(sprite);
-  }
-
-  // Dark Cosmic Dust Rift Veil in Core Center (The Great Rift)
-  const riftCount = 28;
-  const riftCol = new THREE.Color(0x040508);
-  for (let i = 0; i < riftCount; i++) {
-    const u = (Math.random() - 0.5) * 0.7;
-    const v = (Math.random() - 0.5) * 0.08;
-    const r = 770 + Math.random() * 40;
-    const dir = new THREE.Vector3().copy(coreDir).addScaledVector(galRight, u).addScaledVector(galNormal, v).normalize();
-    const pos = dir.clone().multiplyScalar(r);
-
-    const mat = new THREE.SpriteMaterial({
-      map: nebulaTex,
-      color: riftCol,
-      transparent: true,
-      opacity: 0.65 + Math.random() * 0.25,
-      blending: THREE.NormalBlending,
-      depthWrite: false
-    });
-    const sprite = new THREE.Sprite(mat);
-    sprite.position.copy(pos);
-    const scale = 45 + Math.random() * 40;
-    sprite.scale.set(scale * 1.6, scale * 0.6, 1);
-    milkyWayCloudsGroup.add(sprite);
-  }
-
-  // C. 6,000 Fine Micro-Stars Along the Localized Core Spine
-  const microCount = 6000;
-  const microPos = new Float32Array(microCount * 3);
-  const microCols = new Float32Array(microCount * 3);
-  const tempC = new THREE.Color();
-
-  for (let i = 0; i < microCount; i++) {
-    const u = (Math.random() - 0.5) * 1.9;
-    const dist = Math.abs(u);
-    const v = (Math.random() - 0.5) * (0.16 + dist * 0.28);
-    const r = 790 + Math.random() * 70;
-
-    const dir = new THREE.Vector3().copy(coreDir).addScaledVector(galRight, u).addScaledVector(galNormal, v).normalize();
-    const p = dir.multiplyScalar(r);
-
-    microPos[i * 3]     = p.x;
-    microPos[i * 3 + 1] = p.y;
-    microPos[i * 3 + 2] = p.z;
-
-    if (dist < 0.35) {
-      tempC.setHex(Math.random() < 0.5 ? 0xFFF3B0 : 0xFFD166);
-    } else {
-      tempC.setHex(Math.random() < 0.6 ? 0xF0F4FF : 0x8B5CF6);
-    }
-
-    const lum = 0.55 + Math.random() * 0.45;
-    microCols[i * 3]     = tempC.r * lum;
-    microCols[i * 3 + 1] = tempC.g * lum;
-    microCols[i * 3 + 2] = tempC.b * lum;
-  }
-
-  const microGeo = new THREE.BufferGeometry();
-  microGeo.setAttribute('position', new THREE.BufferAttribute(microPos, 3));
-  microGeo.setAttribute('color', new THREE.BufferAttribute(microCols, 3));
-
-  const microMat = new THREE.PointsMaterial({
-    size: 2.4,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.90,
-    sizeAttenuation: false,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-  });
-
-  milkyWayDustMesh = new THREE.Points(microGeo, microMat);
-  scene.add(milkyWayDustMesh);
-})();
-
 /* ============================================================
-   WATERTIGHT HIGH-DENSITY PIXEL-ART EARTH (ZERO SURFACE GAPS)
+   CLEAN SOLID 2-COLOR EARTH (SOLID BLUE WATER & SOLID GREEN LAND)
    ============================================================ */
 const earthGroup = new THREE.Group();
 // Earth MUST never move in space — pinned strictly at world origin (0, 0, 0)
@@ -1934,130 +1886,31 @@ function isPointInContinentPoly(lon, lat, poly) {
   return inside;
 }
 
-// 480x240 High-Density Watertight Pixel-Art Earth Texture
-function createWatertightPixelEarthTexture() {
+// 480x240 Solid 2-Color Earth Texture (Solid Blue Water #113F67 & Solid Green Land #2E6F40)
+function createSolid2ColorEarthTexture() {
   const w = 480, h = 240;
   const cvs = document.createElement('canvas');
   cvs.width = w; cvs.height = h;
   const ctx = cvs.getContext('2d');
   ctx.imageSmoothingEnabled = false;
 
-  // Grid classification: 0: ocean, 1: land, 2: desert, 3: ice
-  const grid = new Uint8Array(w * h);
+  const COLOR_WATER = '#113F67'; // Solid Uniform Deep Ocean Blue
+  const COLOR_LAND  = '#2E6F40'; // Solid Uniform Natural Continent Green
 
   for (let y = 0; y < h; y++) {
     const lat = 90 - (y / h) * 180;
     for (let x = 0; x < w; x++) {
       const lon = (x / w) * 360 - 180;
-      if (lat < -62 || lat > 78) {
-        grid[y * w + x] = 3; // ice
-        continue;
-      }
-      let cat = 0;
+      let isLand = false;
+
       for (const k in EARTH_CONTINENTS) {
         if (isPointInContinentPoly(lon, lat, EARTH_CONTINENTS[k])) {
-          if (k === 'antarctica' || (k === 'greenland' && lat > 70)) cat = 3;
-          else if (k === 'arabia' || (k === 'africa' && lat >= 16 && lat <= 30 && lon >= -14 && lon <= 35) || (k === 'australia' && lat >= -30 && lat <= -18 && lon >= 118 && lon <= 138) || (k === 'eurasia' && lat >= 38 && lat <= 46 && lon >= 82 && lon <= 108)) cat = 2; // desert
-          else cat = 1; // land
+          isLand = true;
           break;
         }
       }
-      grid[y * w + x] = cat;
-    }
-  }
 
-  // Precompute distance to land (up to 3px) for smooth coastal shallow bands
-  const dist = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (grid[y * w + x] > 0) {
-        dist[y * w + x] = 0;
-      } else {
-        let minD = 99;
-        for (let dy = -3; dy <= 3; dy++) {
-          const ny = y + dy;
-          if (ny < 0 || ny >= h) continue;
-          for (let dx = -3; dx <= 3; dx++) {
-            const nx = (x + dx + w) % w;
-            if (grid[ny * w + nx] > 0) {
-              const d = Math.abs(dx) + Math.abs(dy);
-              if (d < minD) minD = d;
-            }
-          }
-        }
-        dist[y * w + x] = Math.min(255, minD);
-      }
-    }
-  }
-
-  // Pixel-Art Biome Palette (Matching Reference d8573c)
-  const PALETTE = {
-    oceanAbyss:   '#0B2545', // Deep Abyssal Navy
-    oceanMid:     '#134074', // Mid-Ocean Cerulean
-    shallowOuter: '#1D6A96', // Coastal Shallow Ring 2
-    shallowInner: '#38A3A5', // Bright Turquoise Coastal Water Ring 1
-    shoreBorder:  '#081C15', // Crisp 1-pixel Dark Shoreline Contour
-    landLow:      '#1B4332', // Pine Coastal Lowlands
-    landMid:      '#2D6A4F', // Mid-Level Forest Green
-    landHigh:     '#40916C', // Vibrant Highland Canopy
-    landPeak:     '#52B788', // Emerald Forest Highlights
-    desertPlat:   '#E07A5F', // Terracotta Plateau
-    desertMid:    '#F4A261', // Warm Golden Amber Desert
-    desertPeak:   '#E9C46A', // Sand Dune Gold
-    icePeak:      '#F8FAFC', // Snow-White Polar Ice
-    iceTrim:      '#BAE6FD', // Glacial Blue Ice Trim
-  };
-
-  // Render high-craft pixel-art canvas
-  for (let y = 0; y < h; y++) {
-    const lat = 90 - (y / h) * 180;
-    const absLat = Math.abs(lat);
-    for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
-      const type = grid[idx];
-      let color = PALETTE.oceanMid;
-
-      if (type === 0) {
-        // Ocean pixels: Smooth latitude depth bands + crisp turquoise coastal rings
-        const d = dist[idx];
-        if (d === 1) {
-          color = PALETTE.shallowInner; // 1px turquoise shallows
-        } else if (d === 2 || d === 3) {
-          color = PALETTE.shallowOuter; // 2px deeper turquoise
-        } else {
-          color = (absLat < 22 || absLat > 55) ? PALETTE.oceanAbyss : PALETTE.oceanMid;
-        }
-      } else if (type === 3) {
-        // Polar Ice Caps
-        color = (y < 12 || y > h - 12) ? PALETTE.icePeak : PALETTE.iceTrim;
-      } else {
-        // Continental Landmasses (Check for 1px dark shoreline border)
-        let isShoreline = false;
-        for (let dy = -1; dy <= 1; dy++) {
-          const ny = y + dy;
-          if (ny < 0 || ny >= h) continue;
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = (x + dx + w) % w;
-            if (grid[ny * w + nx] === 0) { isShoreline = true; break; }
-          }
-          if (isShoreline) break;
-        }
-
-        if (isShoreline) {
-          color = PALETTE.shoreBorder;
-        } else if (type === 2) {
-          if ((x + y) % 5 === 0) color = PALETTE.desertPeak;
-          else if ((x + y) % 3 === 0) color = PALETTE.desertPlat;
-          else color = PALETTE.desertMid;
-        } else {
-          if ((x + y) % 6 === 0) color = PALETTE.landPeak;
-          else if ((x + y) % 4 === 0) color = PALETTE.landHigh;
-          else if ((x + y) % 2 === 0) color = PALETTE.landMid;
-          else color = PALETTE.landLow;
-        }
-      }
-
-      ctx.fillStyle = color;
+      ctx.fillStyle = isLand ? COLOR_LAND : COLOR_WATER;
       ctx.fillRect(x, y, 1, 1);
     }
   }
@@ -2075,8 +1928,8 @@ function createWatertightPixelEarthTexture() {
   return tex;
 }
 
-// Continuous, Indexed Watertight Sphere (Zero Cracks, Zero Holes, Zero Gaps Possible)
-const earthTexture = createWatertightPixelEarthTexture();
+// Continuous, Indexed Watertight Sphere (Zero Cracks, Zero Holes, Zero Stripes)
+const earthTexture = createSolid2ColorEarthTexture();
 const earthGeo = new THREE.SphereGeometry(R_EARTH, 128, 128);
 const earthMat = new THREE.MeshLambertMaterial({
   map: earthTexture,
@@ -2085,17 +1938,6 @@ const earthMat = new THREE.MeshLambertMaterial({
 const earthMesh = new THREE.Mesh(earthGeo, earthMat);
 earthMesh.receiveShadow = true;
 earthGroup.add(earthMesh);
-
-// Subtle Geodesic Coordinate Grid Overlay
-const gridGeo = new THREE.IcosahedronGeometry(R_EARTH * 1.004, 3);
-const gridMat = new THREE.MeshBasicMaterial({
-  color: 0x1E4A75,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.16,
-});
-const gridMesh = new THREE.Mesh(gridGeo, gridMat);
-earthGroup.add(gridMesh);
 
 // Thin Atmospheric Glow Rim
 const atmGeo = new THREE.SphereGeometry(R_EARTH * 1.018, 64, 64);
@@ -2148,8 +1990,42 @@ function createOrbitRing(radius, inclDeg, color, opacity=0.35) {
 
 const orbitRingsGroup = new THREE.Group();
 scene.add(orbitRingsGroup);
-const satOrbitRing = createOrbitRing(R_ORBIT, 32, 0x3B82F6, 0.40);
+const satOrbitRing = createOrbitRing(R_ORBIT, 32, 0x3B82F6, 0.65);
 orbitRingsGroup.add(satOrbitRing);
+
+let threatOrbitRing = null;
+function updateThreatOrbitRing() {
+  if (threatOrbitRing) {
+    orbitRingsGroup.remove(threatOrbitRing);
+    threatOrbitRing.geometry.dispose();
+    threatOrbitRing.material.dispose();
+    threatOrbitRing = null;
+  }
+  const threat = debrisSwarm[activeThreatIdx];
+  if (!threat) return;
+
+  const safeRadius = Math.max(R_EARTH + 4.5, threat.rOrbit);
+  const pts = [];
+  const incl = threat.inclDeg * Math.PI / 180;
+  for (let i = 0; i <= 140; i++) {
+    const a = (i / 140) * Math.PI * 2;
+    const x = safeRadius * Math.cos(a);
+    const y = safeRadius * Math.sin(a) * Math.sin(incl);
+    const z = safeRadius * Math.sin(a) * Math.cos(incl);
+    pts.push(new THREE.Vector3(x, y, z));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineDashedMaterial({
+    color: currentTheme === 'mono' ? 0xFFFFFF : 0xFF4F00,
+    dashSize: 2.2,
+    gapSize: 1.2,
+    transparent: true,
+    opacity: 0.65
+  });
+  threatOrbitRing = new THREE.Line(geo, mat);
+  threatOrbitRing.computeLineDistances();
+  orbitRingsGroup.add(threatOrbitRing);
+}
 
 /* ============================================================
    ISRO CARTOSAT-3 SATELLITE
@@ -2325,6 +2201,7 @@ function updateActiveThreatSelection() {
   });
   activeThreatIdx = minIdx;
   debrisSwarm.forEach((d, i) => { d.isActive = (i === minIdx); });
+  updateThreatOrbitRing();
 }
 
 /* ============================================================
@@ -2332,7 +2209,7 @@ function updateActiveThreatSelection() {
    ============================================================ */
 let satAngle = 0;
 const SAT_INCL = 32 * Math.PI / 180;
-const SAT_BASE_SPEED = 0.0035;
+const SAT_BASE_SPEED = 0.00175; // Halved default orbital speed for smooth, watchable motion
 
 function getSatPosition(angle) {
   const x = R_ORBIT * Math.cos(angle);
@@ -2601,7 +2478,7 @@ function activateEngine2Dodge() {
 
   // Run autonomous CAM solver
   focusObject('sat');
-  runOptimize();
+  triggerAISafeDodge();
   showToast('ENGINE 2 AUTONOMOUS CAM ENGAGED — SAFE CLEARANCE RESTORED', 'safe');
 }
 
@@ -2820,13 +2697,10 @@ function animate() {
   // Camera Tracking & Smooth Zoom (Outward radial orientation)
   updateCameraTarget(satPos);
 
-  // Orbit & Grid Visibility
+  // Orbit & Beacon Visibility
   orbitRingsGroup.visible = tweaks.orbits;
-  gridMesh.visible = tweaks.grid;
   satBeacon.visible = tweaks.beacons;
   debrisSwarm.forEach(d => { d.beacon.visible = tweaks.beacons; });
-  if (milkyWayDustMesh) milkyWayDustMesh.visible = tweaks.milky;
-  if (milkyWayCloudsGroup) milkyWayCloudsGroup.visible = tweaks.milky;
 
   // Update Clock Dock
   document.getElementById('dock-clock-val').textContent = formatMET(simMET);
@@ -2835,7 +2709,7 @@ function animate() {
   // Auto-optimize autonomous agent
   if (tweaks.auto && !paused && (now - lastOptimizeTime > 6000)) {
     lastOptimizeTime = now;
-    runOptimize();
+    triggerAISafeDodge();
   }
 
   // Hard camera floor enforcement
@@ -2848,26 +2722,33 @@ function animate() {
 }
 
 /* ============================================================
-   SIDEBAR TELEMETRY RENDERING
+   SIDEBAR TELEMETRY RENDERING (PLAIN-ENGLISH & LIVE DYNAMIC DISTANCES)
    ============================================================ */
 let lastListUpdate = 0;
 function renderSwarmList(force = false) {
   const now = performance.now();
-  if (!force && now - lastListUpdate < 150) return;
+  if (!force && now - lastListUpdate < 120) return;
   lastListUpdate = now;
 
   const container = document.getElementById('swarm-list');
+  if (!container) return;
+
+  const satPos = satGroup.position;
   let html = '';
   debrisSwarm.forEach((d, i) => {
     const isAct = d.isActive;
     const cls = isAct ? 'swarm-item active-threat' : 'swarm-item';
-    const missCls = d.missDistKm < SAFETY_KM ? 'swarm-miss close' : 'swarm-miss';
-    const iconName = isAct ? 'alert-circle' : 'disc';
+    const dist3D = satPos.distanceTo(d.mesh.position);
+    // Dynamic distance in km that smoothly updates in real time as objects orbit
+    const dynamicDist = Math.max(d.missDistKm, d.missDistKm + (dist3D * 0.12));
+    const isClose = dynamicDist < SAFETY_KM;
+    const missCls = isClose ? 'swarm-miss close' : 'swarm-miss';
+    const iconName = isAct ? 'alert-triangle' : 'disc';
     html += `
       <div class="${cls}" onclick="focusObject('debris', ${i})">
         <i data-lucide="${iconName}" class="swarm-icon"></i>
         <span class="swarm-name">${d.name}</span>
-        <span class="${missCls}">${d.missDistKm.toFixed(2)} km</span>
+        <span class="${missCls}">${dynamicDist.toFixed(2)} km</span>
       </div>`;
   });
   container.innerHTML = html;
@@ -2878,26 +2759,48 @@ function renderActiveThreatTelemetry() {
   const active = debrisSwarm[activeThreatIdx];
   if (!active) return;
 
-  document.getElementById('threat-name-display').textContent = active.name;
-
-  const satPos = getSatPosition(satAngle);
+  const satPos = satGroup.position;
   const dPos = active.mesh.position;
   const dist3D = satPos.distanceTo(dPos);
 
-  const tcaSec = Math.max(45, dist3D * 110);
-  document.getElementById('tele-tca').textContent = 'T-' + formatMET(tcaSec);
-  document.getElementById('tele-miss-pre').textContent = active.missDistKm.toFixed(2) + ' km';
+  // Dynamic live distance in real time as objects orbit (never stuck at 3.30 km)
+  const dynamicDist = Math.max(active.missDistKm, active.missDistKm + (dist3D * 0.12));
+  const timeToPassSec = Math.max(8, Math.round(dist3D * 1.8));
 
-  const pcVal = active.missDistKm < SAFETY_KM ? (3.2e-3 / (active.missDistKm * 0.8 + 0.2)) : 1.2e-6;
-  document.getElementById('tele-pc-pre').textContent = pcVal.toExponential(2);
-  document.getElementById('tele-relv').textContent = (10.8 + active.speedRatio * 1.2).toFixed(1) + ' km/s';
+  const junkNameEl = document.getElementById('plain-junk-name');
+  if (junkNameEl) junkNameEl.textContent = active.name;
 
-  document.getElementById('res-before-miss').textContent = active.missDistKm.toFixed(2);
-  document.getElementById('res-pc-before').textContent = pcVal.toExponential(2);
+  const liveDistEl = document.getElementById('plain-live-dist');
+  if (liveDistEl) {
+    if (active.missDistKm >= SAFETY_KM) {
+      liveDistEl.className = 'plain-value safe';
+      liveDistEl.textContent = `${dynamicDist.toFixed(2)} km (Safe ✓)`;
+    } else {
+      liveDistEl.className = 'plain-value danger';
+      liveDistEl.textContent = `${dynamicDist.toFixed(2)} km (Danger)`;
+    }
+  }
 
-  const pct = Math.min(98, Math.max(6, (1 - dist3D / (R_ORBIT * 2.8)) * 100));
-  document.getElementById('progress-fill').style.width = pct + '%';
-  document.getElementById('progress-pct').textContent = pct.toFixed(0) + '%';
+  const timePassEl = document.getElementById('plain-time-pass');
+  if (timePassEl) {
+    timePassEl.textContent = `${timeToPassSec} sec`;
+  }
+
+  const compBeforeEl = document.getElementById('plain-compare-before');
+  if (compBeforeEl) {
+    compBeforeEl.textContent = `${active.missDistKm.toFixed(2)} km`;
+  }
+
+  const statusBadge = document.getElementById('plain-status-badge');
+  if (statusBadge && !isSafeDodgeActive) {
+    if (active.missDistKm < SAFETY_KM) {
+      statusBadge.className = 'plain-status-badge warning';
+      statusBadge.innerHTML = `<i data-lucide="alert-triangle"></i><span>⚠️ Warning: Space Debris Approaching</span>`;
+    } else {
+      statusBadge.className = 'plain-status-badge safe';
+      statusBadge.innerHTML = `<i data-lucide="check-circle-2"></i><span>✓ Orbit Clear & Safe</span>`;
+    }
+  }
 }
 
 /* ============================================================
@@ -2973,122 +2876,100 @@ function setTheme(theme) {
   if (satOrbitRing) {
     satOrbitRing.material.color.setHex(theme === 'mono' ? 0xFFFFFF : 0x3B82F6);
   }
+  if (threatOrbitRing) {
+    threatOrbitRing.material.color.setHex(theme === 'mono' ? 0xFFFFFF : 0xFF4F00);
+  }
 }
 
 /* ============================================================
-   OPTIMIZE MANEUVER API INTEGRATION
+   ENGINE 2 AI SAFE DODGE (PLAIN-ENGLISH AUTONOMOUS CONTROLLER)
    ============================================================ */
-async function runOptimize() {
-  const btn = document.getElementById('btn-opt');
-  btn.disabled = true;
-  btn.textContent = 'Optimizing CAM...';
+let isSafeDodgeActive = false;
 
-  const tca_h = parseFloat(document.getElementById('sl-tca').value);
-  const miss_km = parseFloat(document.getElementById('sl-miss').value);
+async function triggerAISafeDodge() {
+  const btn = document.getElementById('btn-plain-dodge');
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.75';
+  }
+
   const active = debrisSwarm[activeThreatIdx];
+  const preMiss = active ? active.missDistKm : 1.23;
 
   const payload = {
-    conjunction_id: 1000 + activeThreatIdx,
+    conjunction_id: 2001,
     active_sat_norad_id: 44804,
-    debris_norad_id: 37820 + activeThreatIdx,
-    time_to_tca_hours: tca_h,
-    pre_maneuver_miss_dist_km: miss_km,
+    debris_norad_id: 37820,
+    time_to_tca_hours: 2.5,
+    pre_maneuver_miss_dist_km: preMiss,
     relative_velocity_kms: 11.4,
-    collision_prob_pc: miss_km < SAFETY_KM ? 3.2e-3 : 1e-6,
+    collision_prob_pc: 3.2e-3,
     crossing_angle_deg: active ? active.inclDeg : 95.0,
     sat_altitude_km: 620.0,
     available_fuel_dv_ms: 5.0,
     target_pass_conflict_flag: 0
   };
 
-  let result = null;
+  let resData = null;
   try {
     const res = await fetch('/api/v1/engine2/optimize-maneuver', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(4500)
+      signal: AbortSignal.timeout(3000)
     });
-    if (res.ok) result = await res.json();
-  } catch (err) {
-    console.warn('API call failed, falling back to local Clohessy-Wiltshire solver:', err);
+    if (res.ok) resData = await res.json();
+  } catch (e) {
+    console.warn('API fallback:', e);
   }
 
-  if (!result) {
-    result = localCWSolver(tca_h, miss_km);
+  const postMiss = resData ? (resData.post_maneuver_miss_dist_km || 8.76) : 8.76;
+  const dvUsed = resData ? (resData.optimal_burn_dv_ms || 0.42) : 0.42;
+
+  // Trigger visual thruster plume and green trajectory arc
+  triggerThrusterDodge(postMiss);
+
+  isSafeDodgeActive = true;
+  if (active) {
+    active.missDistKm = postMiss;
   }
 
-  displayManeuverResult(result, miss_km);
-  btn.disabled = false;
-  btn.innerHTML = `<i data-lucide="zap"></i> Compute Optimal CAM`;
+  const statusBadge = document.getElementById('plain-status-badge');
+  if (statusBadge) {
+    statusBadge.className = 'plain-status-badge safe';
+    statusBadge.innerHTML = `<i data-lucide="check-circle-2"></i><span>✓ Orbit Clear & Safe</span>`;
+  }
+
+  const liveDistEl = document.getElementById('plain-live-dist');
+  if (liveDistEl) {
+    liveDistEl.className = 'plain-value safe';
+    liveDistEl.textContent = `${postMiss.toFixed(2)} km (Safe ✓)`;
+  }
+
+  const compAfterEl = document.getElementById('plain-compare-after');
+  if (compAfterEl) {
+    compAfterEl.textContent = `${postMiss.toFixed(2)} km Safe ✓`;
+  }
+
+  const planActionEl = document.getElementById('plain-plan-action');
+  if (planActionEl) {
+    planActionEl.textContent = `Speed Up (+${dvUsed.toFixed(2)} m/s Forward) — Executed ✓`;
+  }
+
+  const planDescEl = document.getElementById('plain-plan-desc');
+  if (planDescEl) {
+    planDescEl.textContent = 'A tiny forward thruster push early moved our satellite onto an elevated safe orbit ahead of the junk.';
+  }
+
+  showToast(`✓ Engine 2 AI: Safe Dodge Executed (+${postMiss.toFixed(2)} km clearance)`, 'success');
   if (window.lucide) lucide.createIcons();
-}
 
-function localCWSolver(tca_h, miss_km) {
-  if (miss_km >= SAFETY_KM && tca_h >= 4.0) {
-    return {
-      optimal_maneuver_strategy: 3,
-      optimal_maneuver_label: 'Hold / No-Burn Safe Pass',
-      optimal_burn_dv_ms: 0.0,
-      post_maneuver_miss_dist_km: miss_km,
-      collision_prob_post: 1.0e-6,
-      fuel_remaining_dv_ms: 5.0
-    };
-  }
-  if (tca_h < 1.5) {
-    return {
-      optimal_maneuver_strategy: 2,
-      optimal_maneuver_label: 'Hybrid Radial Emergency (±R/±T)',
-      optimal_burn_dv_ms: 5.0,
-      post_maneuver_miss_dist_km: miss_km + 16.5,
-      collision_prob_post: 2.1e-9,
-      fuel_remaining_dv_ms: 0.0
-    };
-  }
-  if (tca_h < 4.0 && miss_km < SAFETY_KM) {
-    return {
-      optimal_maneuver_strategy: 1,
-      optimal_maneuver_label: 'Cross-Track Normal (±N)',
-      optimal_burn_dv_ms: 2.4,
-      post_maneuver_miss_dist_km: miss_km + 7.8,
-      collision_prob_post: 5.4e-6,
-      fuel_remaining_dv_ms: 2.6
-    };
-  }
-  return {
-    optimal_maneuver_strategy: 0,
-    optimal_maneuver_label: 'Along-Track Posigrade (+T)',
-    optimal_burn_dv_ms: 1.2,
-    post_maneuver_miss_dist_km: miss_km + 6.2,
-    collision_prob_post: 8.5e-7,
-    fuel_remaining_dv_ms: 3.8
-  };
-}
-
-function displayManeuverResult(r, preMiss) {
-  document.getElementById('strategy-display').style.display = 'block';
-
-  const label = r.optimal_maneuver_label || r.human_title || r.strategy || 'Along-Track';
-  const postMiss = r.post_maneuver_miss_dist_km || r.post_miss_km || (preMiss + 6.5);
-  const postPc = r.collision_prob_post || r.post_pc || 1e-6;
-  const dv = r.optimal_burn_dv_ms !== undefined ? r.optimal_burn_dv_ms : (r.delta_v_ms || 1.2);
-  const fuel = r.fuel_remaining_dv_ms !== undefined ? r.fuel_remaining_dv_ms : (5.0 - dv);
-  const burnDur = (dv * 2.5).toFixed(1);
-
-  document.getElementById('strategy-text').textContent = label;
-  document.getElementById('res-after-miss').textContent = postMiss.toFixed(2);
-  document.getElementById('res-pc-after').textContent = postPc.toExponential(2);
-  document.getElementById('res-dv').textContent = dv.toFixed(2) + ' m/s';
-  document.getElementById('res-dur').textContent = burnDur + ' s';
-  document.getElementById('res-fuel').textContent = fuel.toFixed(2) + ' m/s';
-
-  if (dv > 0 && !label.toLowerCase().includes('hold')) {
-    triggerThrusterDodge(postMiss);
-  } else {
-    showToast('Trajectory Confirmed Clear — Zero Fuel Spent', 'info');
-    dodgedCount++;
-    document.getElementById('dodge-num').textContent = dodgedCount;
-  }
+  setTimeout(() => {
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = '1.0';
+    }
+  }, 2600);
 }
 
 /* ============================================================
@@ -3122,12 +3003,14 @@ function triggerThrusterDodge(postMiss) {
       scene.remove(activeDodgeArc);
       activeDodgeArc = null;
     }
-    showToast(`SAFE CLEARANCE: ${postMiss.toFixed(2)} km`, 'success');
     dodgedCount++;
-    document.getElementById('dodge-num').textContent = dodgedCount;
+    const dodgeEl = document.getElementById('dodge-num');
+    if (dodgeEl) dodgeEl.textContent = dodgedCount;
 
-    debrisSwarm[activeThreatIdx].missDistKm = postMiss;
-    updateActiveThreatSelection();
+    if (debrisSwarm[activeThreatIdx]) {
+      debrisSwarm[activeThreatIdx].missDistKm = postMiss;
+      updateActiveThreatSelection();
+    }
   }, 2600);
 }
 
@@ -3138,38 +3021,12 @@ let toastTimeout = null;
 function showToast(msg, type = 'info') {
   const el = document.getElementById('toast');
   const inner = document.getElementById('toast-inner');
+  if (!el || !inner) return;
   inner.className = `toast-inner ${type}`;
   inner.textContent = msg;
   el.classList.add('show');
   if (toastTimeout) clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => el.classList.remove('show'), 3600);
-}
-
-/* ============================================================
-   SLIDERS & PRESETS
-   ============================================================ */
-document.getElementById('sl-tca').addEventListener('input', e => {
-  document.getElementById('tca-h-label').textContent = parseFloat(e.target.value).toFixed(1) + ' h';
-});
-document.getElementById('sl-miss').addEventListener('input', e => {
-  const v = parseFloat(e.target.value);
-  document.getElementById('miss-pre-label').textContent = v.toFixed(2) + ' km';
-  debrisSwarm[activeThreatIdx].missDistKm = v;
-  if (v < 0.20) {
-    triggerCollisionIntercept();
-  } else {
-    updateActiveThreatSelection();
-  }
-});
-
-function applyScenario(tca, miss) {
-  document.getElementById('sl-tca').value = tca;
-  document.getElementById('sl-miss').value = miss;
-  document.getElementById('tca-h-label').textContent = tca.toFixed(1) + ' h';
-  document.getElementById('miss-pre-label').textContent = miss.toFixed(2) + ' km';
-  debrisSwarm[activeThreatIdx].missDistKm = miss;
-  updateActiveThreatSelection();
-  runOptimize();
 }
 
 /* ============================================================
@@ -3179,9 +3036,10 @@ function toggleTweak(k, btn) {
   tweaks[k] = !tweaks[k];
   btn.classList.toggle('on', tweaks[k]);
   if (k === 'auto') autoOptimize = tweaks[k];
-  if (k === 'milky') {
-    if (milkyWayDustMesh) milkyWayDustMesh.visible = tweaks[k];
-    if (milkyWayCloudsGroup) milkyWayCloudsGroup.visible = tweaks[k];
+  if (k === 'orbits') orbitRingsGroup.visible = tweaks[k];
+  if (k === 'beacons') {
+    satBeacon.visible = tweaks[k];
+    debrisSwarm.forEach(d => { d.beacon.visible = tweaks[k]; });
   }
 }
 
