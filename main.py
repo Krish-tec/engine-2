@@ -34,6 +34,12 @@ PLOTS_DIR = OUTPUTS_DIR / "plots"
 for d in [DATA_DIR, DATA_DIR / "tles", MODELS_DIR, OUTPUTS_DIR, PLOTS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
+# ── Expose FastAPI ASGI App (for Vercel & ASGI runners) ─────────────────
+try:
+    from src.api import app
+except Exception:
+    app = None
+
 
 def main():
     parser = argparse.ArgumentParser(description="UC096 Engine 2 CAM Pipeline")

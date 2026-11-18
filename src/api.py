@@ -393,17 +393,27 @@ def _optimize(inp: ConjunctionInput) -> ManeuverOutput:
 @app.get("/ui", response_class=HTMLResponse)
 def get_mission_control_ui():
     """Serve the 3D Mission Control dashboard."""
-    ui_path = Path(__file__).resolve().parent.parent / "outputs" / "mission_control.html"
-    if ui_path.exists():
-        with open(ui_path, "r", encoding="utf-8") as f:
-            return f.read()
+    candidates = [
+        Path(__file__).resolve().parent.parent / "outputs" / "mission_control.html",
+        Path.cwd() / "outputs" / "mission_control.html",
+        Path("/var/task/outputs/mission_control.html"),
+    ]
+    for p in candidates:
+        if p.exists():
+            with open(p, "r", encoding="utf-8") as f:
+                return f.read()
     return "<h1>Mission Control UI not found. Please build outputs/mission_control.html.</h1>"
 
 
 # Mount static plots directory for viewing interactive 3D HTMLs
-PLOTS_DIR = Path(__file__).resolve().parent.parent / "outputs" / "plots"
-if PLOTS_DIR.exists():
-    app.mount("/plots", StaticFiles(directory=str(PLOTS_DIR)), name="plots")
+for candidate in [
+    Path(__file__).resolve().parent.parent / "outputs" / "plots",
+    Path.cwd() / "outputs" / "plots",
+    Path("/var/task/outputs/plots"),
+]:
+    if candidate.exists():
+        app.mount("/plots", StaticFiles(directory=str(candidate)), name="plots")
+        break
 
 
 @app.get("/health")
@@ -432,12 +442,15 @@ def optimize_maneuver(input_data: ConjunctionInput):
 @app.get("/api/v1/engine2/benchmark")
 def get_benchmark():
     """Return latest benchmark metrics produced by ``main.py``."""
-    metrics_path = (
-        Path(__file__).resolve().parent.parent / "outputs" / "benchmark_metrics.json"
-    )
-    if metrics_path.exists():
-        with open(metrics_path) as f:
-            return json.load(f)
+    candidates = [
+        Path(__file__).resolve().parent.parent / "outputs" / "benchmark_metrics.json",
+        Path.cwd() / "outputs" / "benchmark_metrics.json",
+        Path("/var/task/outputs/benchmark_metrics.json"),
+    ]
+    for p in candidates:
+        if p.exists():
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
     raise HTTPException(
         status_code=404,
         detail="Benchmark metrics not yet generated. Run main.py first.",
