@@ -9,5 +9,6 @@ __pycache__/
 .agents/
 .claude/
 skills-lock.json
+api/test.txt
 
 
