@@ -8,10 +8,10 @@ const EXAG = 20;
 const UP = new THREE.Vector3(0, 1, 0);
 
 function createArrowGeometry(): THREE.BufferGeometry {
-  const shaft = new THREE.CylinderGeometry(0.022, 0.022, 0.65, 8);
-  shaft.translate(0, 0.325, 0);
-  const head = new THREE.ConeGeometry(0.065, 0.28, 8);
-  head.translate(0, 0.79, 0);
+  const shaft = new THREE.CylinderGeometry(0.032, 0.032, 0.70, 8);
+  shaft.translate(0, 0.35, 0);
+  const head = new THREE.ConeGeometry(0.085, 0.30, 8);
+  head.translate(0, 0.85, 0);
   const merged = mergeGeometries([shaft, head]);
   shaft.dispose();
   head.dispose();
@@ -27,50 +27,36 @@ export const COL = {
 };
 
 export const DEBRIS_PALETTE = [
-  0x94a3b8, // Weathered aluminum (#94A3B8)
-  0x64748b, // Scorched titanium (#64748B)
-  0x475569, // Dark carbon composite (#475569)
-  0xc27803, // Torn gold Kapton foil (#C27803)
-  0xcbd5e1, // Pale ceramic / painted hull (#CBD5E1)
+  0x525c68, // Gunmetal (#525C68)
+  0x6e7b8b, // Slate Alloy (#6E7B8B)
+  0x8a96a3, // Weathered Titanium (#8A96A3)
+  0x3b424c, // Dark Char (#3B424C)
 ];
 
-function createShardGeometry(prng: Mulberry32): THREE.BufferGeometry {
-  const geo = new THREE.DodecahedronGeometry(0.24, 0);
+export function createCraggyDebrisGeometry(): THREE.BufferGeometry {
+  const geo = new THREE.IcosahedronGeometry(0.18, 1);
   const pos = geo.attributes.position;
+  const hashDisplacements = new Map<string, number>();
+
   for (let i = 0; i < pos.count; i++) {
-    const s = prng.range(0.72, 1.28);
-    pos.setXYZ(i, pos.getX(i) * s, pos.getY(i) * s, pos.getZ(i) * s);
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const key = `${Math.round(x * 10000)},${Math.round(y * 10000)},${Math.round(z * 10000)}`;
+
+    let factor = hashDisplacements.get(key);
+    if (factor === undefined) {
+      const noise =
+        0.98 +
+        0.24 * Math.sin(3.1 * x + 1.7 * y) * Math.cos(2.3 * z) +
+        0.1 * Math.sin(7.3 * y - 4.1 * z);
+      factor = Math.max(0.68, Math.min(1.28, noise));
+      hashDisplacements.set(key, factor);
+    }
+    pos.setXYZ(i, x * factor, y * factor, z * factor);
   }
   geo.computeVertexNormals();
   return geo;
-}
-
-function createPanelGeometry(): THREE.BufferGeometry {
-  return new THREE.BoxGeometry(0.7, 0.04, 0.45);
-}
-
-function createCasingGeometry(): THREE.BufferGeometry {
-  return new THREE.CylinderGeometry(0.12, 0.14, 0.52, 10);
-}
-
-function createStrutGeometry(prng: Mulberry32): THREE.BufferGeometry {
-  const geo = new THREE.OctahedronGeometry(0.22, 0);
-  const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const sx = prng.range(0.65, 0.95);
-    const sy = prng.range(1.65, 2.35);
-    const sz = prng.range(0.65, 0.95);
-    pos.setXYZ(i, pos.getX(i) * sx, pos.getY(i) * sy, pos.getZ(i) * sz);
-  }
-  geo.computeVertexNormals();
-  return geo;
-}
-
-export interface DebrisBucket {
-  mesh: THREE.InstancedMesh;
-  geometry: THREE.BufferGeometry;
-  material: THREE.Material;
-  capacity: number;
 }
 
 export const toScene = (r: number[]): THREE.Vector3 => new THREE.Vector3(r[0] * KM, r[2] * KM, -r[1] * KM);
@@ -200,17 +186,18 @@ export class SceneView {
   private threatRing!: THREE.Sprite;
   private debrisPoints: THREE.Points | null = null;
   private debrisArrowInstancedMesh: THREE.InstancedMesh | null = null;
-  public debrisBuckets: DebrisBucket[] = [];
+  public debrisInstancedMesh: THREE.InstancedMesh | null = null;
   private activeCollisions: ActiveCollisionEffect[] = [];
   private selectedDebrisMesh: THREE.Mesh | null = null;
   private _lines: THREE.Line[] = [];
   private _plumeT?: number;
   private _tmp: THREE.Vector3 = new THREE.Vector3();
+  private _tmpPos: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVel: THREE.Vector3 = new THREE.Vector3();
+  private _tmpAvoid: THREE.Vector3 = new THREE.Vector3();
   private _isEco: boolean = false;
 
-  // Debris Multi-Archetype Per-Instance State Arrays
-  private _debBucket: Uint8Array = new Uint8Array(0);
-  private _debSlot: Uint16Array = new Uint16Array(0);
+  // Debris Per-Instance State Arrays
   private _debScaleX: Float32Array = new Float32Array(0);
   private _debScaleY: Float32Array = new Float32Array(0);
   private _debScaleZ: Float32Array = new Float32Array(0);
@@ -239,7 +226,6 @@ export class SceneView {
   private _deltaEuler: THREE.Euler = new THREE.Euler();
   private _deltaQ: THREE.Quaternion = new THREE.Quaternion();
   private _scratchEuler: THREE.Euler = new THREE.Euler();
-  private _scratchCol: THREE.Color = new THREE.Color();
 
   public onContextLost?: () => void;
   public onContextRestored?: () => void;
@@ -473,12 +459,12 @@ export class SceneView {
       l.geometry.dispose();
     }
     this._lines = [];
-    for (const b of this.debrisBuckets) {
-      this.dynamic.remove(b.mesh);
-      b.geometry.dispose();
-      b.material.dispose();
+    if (this.debrisInstancedMesh) {
+      this.dynamic.remove(this.debrisInstancedMesh);
+      this.debrisInstancedMesh.geometry.dispose();
+      (this.debrisInstancedMesh.material as THREE.Material).dispose();
+      this.debrisInstancedMesh = null;
     }
-    this.debrisBuckets = [];
     if (this.debrisPoints) {
       this.dynamic.remove(this.debrisPoints);
       this.debrisPoints.geometry.dispose();
@@ -685,10 +671,8 @@ export class SceneView {
       });
     });
 
-    // 7. Multi-Shape 3D Debris (4 Distinct Instanced Archetypes, Seeded & Deterministic)
+    // 7. Organic Craggy 3D Space Debris (Single Unified InstancedMesh, Seeded & Deterministic)
     const cap = debrisBodies.length;
-    this._debBucket = new Uint8Array(cap);
-    this._debSlot = new Uint16Array(cap);
     this._debScaleX = new Float32Array(cap);
     this._debScaleY = new Float32Array(cap);
     this._debScaleZ = new Float32Array(cap);
@@ -701,70 +685,44 @@ export class SceneView {
     this._debBaseColor = [];
 
     const prng = new Mulberry32(1337);
-    const bucketCounts = [0, 0, 0, 0];
 
     for (let i = 0; i < cap; i++) {
-      const r = prng.next();
-      let b = 0;
-      if (r < 0.35) b = 0; // ~35% Jagged Shards
-      else if (r < 0.60) b = 1; // ~25% Broken Solar Panels
-      else if (r < 0.80) b = 2; // ~20% Rocket Casings / Tanks
-      else b = 3; // ~20% Twisted Struts
-
-      this._debBucket[i] = b;
-      this._debSlot[i] = bucketCounts[b];
-      bucketCounts[b]++;
-
-      this._debScaleX[i] = prng.range(0.55, 1.85);
-      this._debScaleY[i] = prng.range(0.55, 1.85);
-      this._debScaleZ[i] = prng.range(0.55, 1.85);
+      // Natural non-uniform scale: base uniform s in [0.70, 1.40] with axis jitter +-12%
+      const baseS = prng.range(0.70, 1.40);
+      this._debScaleX[i] = baseS * (1.0 + prng.range(-0.12, 0.12));
+      this._debScaleY[i] = baseS * (1.0 + prng.range(-0.12, 0.12));
+      this._debScaleZ[i] = baseS * (1.0 + prng.range(-0.12, 0.12));
 
       this._debRotX[i] = prng.range(0, Math.PI * 2);
       this._debRotY[i] = prng.range(0, Math.PI * 2);
       this._debRotZ[i] = prng.range(0, Math.PI * 2);
 
-      const speed = prng.range(0.15, 2.4);
-      const dx = prng.range(-1, 1);
-      const dy = prng.range(-1, 1);
-      const dz = prng.range(-1, 1);
-      const dLen = Math.hypot(dx, dy, dz) || 1;
-      this._debSpinX[i] = (dx / dLen) * speed;
-      this._debSpinY[i] = (dy / dLen) * speed;
-      this._debSpinZ[i] = (dz / dLen) * speed;
+      // Calm, realistic zero-G tumble spin: [-0.65, +0.65] rad/s per axis
+      this._debSpinX[i] = prng.range(-0.65, 0.65);
+      this._debSpinY[i] = prng.range(-0.65, 0.65);
+      this._debSpinZ[i] = prng.range(-0.65, 0.65);
 
       const colHex = DEBRIS_PALETTE[Math.floor(prng.next() * DEBRIS_PALETTE.length)];
       this._debBaseColor[i] = new THREE.Color(colHex);
     }
 
-    const shardGeo = createShardGeometry(prng);
-    const panelGeo = createPanelGeometry();
-    const casingGeo = createCasingGeometry();
-    const strutGeo = createStrutGeometry(prng);
-
-    const geos = [shardGeo, panelGeo, casingGeo, strutGeo];
-    const mats = [
-      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.85, roughness: 0.35, flatShading: true }),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.9, roughness: 0.22, flatShading: true }),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.78, roughness: 0.38, flatShading: true }),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.45, flatShading: true }),
-    ];
-
-    this.debrisBuckets = geos.map((g, bIdx) => {
-      const count = Math.max(1, bucketCounts[bIdx]);
-      const mesh = new THREE.InstancedMesh(g, mats[bIdx], count);
-      mesh.frustumCulled = false;
-      this.dynamic.add(mesh);
-      return { mesh, geometry: g, material: mats[bIdx], capacity: count };
+    const debrisGeo = createCraggyDebrisGeometry();
+    const debrisMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 0.72,
+      roughness: 0.48,
+      flatShading: true,
     });
 
+    this.debrisInstancedMesh = new THREE.InstancedMesh(debrisGeo, debrisMat, cap);
+    this.debrisInstancedMesh.frustumCulled = false;
     for (let i = 0; i < cap; i++) {
-      const b = this._debBucket[i];
-      const slot = this._debSlot[i];
-      this.debrisBuckets[b].mesh.setColorAt(slot, this._debBaseColor[i]);
+      this.debrisInstancedMesh.setColorAt(i, this._debBaseColor[i]);
     }
-    this.debrisBuckets.forEach(b => {
-      if (b.mesh.instanceColor) b.mesh.instanceColor.needsUpdate = true;
-    });
+    if (this.debrisInstancedMesh.instanceColor) {
+      this.debrisInstancedMesh.instanceColor.needsUpdate = true;
+    }
+    this.dynamic.add(this.debrisInstancedMesh);
 
     const debArrowGeo = createArrowGeometry();
     const debArrowMat = new THREE.MeshBasicMaterial({
@@ -784,7 +742,7 @@ export class SceneView {
     sats,
     debris,
     gmstAngle,
-    threatIdx = -1,
+    threatIdx: _threatIdx = -1,
     threatPos = null,
     selected = null,
     burnPath = null,
@@ -815,7 +773,9 @@ export class SceneView {
     sats.forEach((st, i) => {
       const s = this.sats[i];
       if (!s || !st) return;
-      const p = toScene(st.r);
+      const p = (st as any)?.rScene
+        ? this._tmpPos.set((st as any).rScene[0], (st as any).rScene[1], (st as any).rScene[2])
+        : toScene(st.r);
       s.group.position.copy(p);
       const dir = this._tmp.copy(toScene(st.v)).sub(p);
       if (dir.lengthSq() > 1e-6) s.group.lookAt(p.clone().add(dir));
@@ -833,29 +793,32 @@ export class SceneView {
       if (s.beacon) (s.beacon.material as THREE.SpriteMaterial).opacity = alpha;
       if (s.label) (s.label.material as THREE.SpriteMaterial).opacity = THREE.MathUtils.clamp((camDist - 3.5) / 8.0, 0.0, 0.95);
 
-      const arrowScale = THREE.MathUtils.clamp(camDist * 0.09, 0.28, 2.2);
+      const arrowScale = THREE.MathUtils.clamp(camDist * 0.065, 0.22, 2.4);
 
       // 1. Blue Default Velocity Arrow (Always visible on active satellites)
       if (s.blueVelArrow) {
         if (isVisible && satVelocities[i]) {
-          const vScene = toScene(satVelocities[i]!).normalize();
-          s.blueVelArrow.position.copy(p);
+          const vScene = this._tmpVel.set(satVelocities[i]![0], satVelocities[i]![1], satVelocities[i]![2]).normalize();
+          s.blueVelArrow.position.copy(p).addScaledVector(vScene, 0.22);
           s.blueVelArrow.quaternion.setFromUnitVectors(UP, vScene);
           s.blueVelArrow.scale.set(arrowScale, arrowScale, arrowScale);
+          const isTargetSat = (selected?.sat ?? 0) === i;
+          const isDodgeActive = isTargetSat && avoidanceVisible && this._avoidPathOpacity > 0.01;
+          (s.blueVelArrow.material as THREE.MeshStandardMaterial).opacity = isDodgeActive ? 0.45 : 1.0;
           s.blueVelArrow.visible = true;
         } else {
           s.blueVelArrow.visible = false;
         }
       }
 
-      // 2. Green Avoidance Maneuver Arrow (Context-aware smart visibility & smooth fade)
+      // 2. Green Avoidance Maneuver Arrow (Exact tangent of the green avoidance curve)
       if (s.greenAvoidArrow) {
         const isTargetSat = (selected?.sat ?? 0) === i;
         if (isVisible && isTargetSat && avoidanceVisible && avoidanceVec && this._avoidPathOpacity > 0.01) {
-          const aScene = toScene(avoidanceVec).normalize();
-          s.greenAvoidArrow.position.copy(p);
+          const aScene = this._tmpAvoid.set(avoidanceVec[0], avoidanceVec[1], avoidanceVec[2]).normalize();
+          s.greenAvoidArrow.position.copy(p).addScaledVector(aScene, 0.22);
           s.greenAvoidArrow.quaternion.setFromUnitVectors(UP, aScene);
-          const greenScale = arrowScale * 1.15;
+          const greenScale = arrowScale * 1.2;
           s.greenAvoidArrow.scale.set(greenScale, greenScale, greenScale);
           (s.greenAvoidArrow.material as THREE.MeshStandardMaterial).opacity = this._avoidPathOpacity;
           s.greenAvoidArrow.visible = true;
@@ -904,20 +867,15 @@ export class SceneView {
       }
     }
 
-    // Update Multi-Shape Tumbling 3D Space Debris (4 distinct instanced archetypes, zero per-frame allocation)
-    if (this.debrisBuckets.length === 4) {
+    // Update Organic Craggy 3D Space Debris (1 InstancedMesh draw call, zero allocations)
+    if (this.debrisInstancedMesh) {
       const maxDeb = Math.min(this.activeDebris, debris.length);
-      const cap = this._debBucket.length;
+      const cap = this._debScaleX.length;
 
       for (let i = 0; i < cap; i++) {
         const pKm = debris[i];
-        const b = this._debBucket[i];
-        const slot = this._debSlot[i];
-        const bucketMesh = this.debrisBuckets[b]?.mesh;
-        if (!bucketMesh) continue;
-
         if (i < maxDeb && pKm) {
-          // Advance independent 3-axis tumble rotation
+          // Advance calm, realistic zero-G tumble
           this._debRotX[i] += this._debSpinX[i] * dtReal;
           this._debRotY[i] += this._debSpinY[i] * dtReal;
           this._debRotZ[i] += this._debSpinZ[i] * dtReal;
@@ -927,26 +885,13 @@ export class SceneView {
           this._dummyPos.set(pKm[0] * KM, pKm[2] * KM, -pKm[1] * KM);
           this._dummyScale.set(this._debScaleX[i], this._debScaleY[i], this._debScaleZ[i]);
           this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._dummyScale);
-          bucketMesh.setMatrixAt(slot, this._dummyMat);
-
-          // Highlight active threat debris with warm orange tint
-          if (threatIdx === i) {
-            this._scratchCol.setHex(0xf97316);
-            bucketMesh.setColorAt(slot, this._scratchCol);
-          } else {
-            bucketMesh.setColorAt(slot, this._debBaseColor[i]);
-          }
+          this.debrisInstancedMesh.setMatrixAt(i, this._dummyMat);
         } else {
           this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._zeroScale);
-          bucketMesh.setMatrixAt(slot, this._dummyMat);
+          this.debrisInstancedMesh.setMatrixAt(i, this._dummyMat);
         }
       }
-
-      for (let b = 0; b < 4; b++) {
-        const m = this.debrisBuckets[b].mesh;
-        m.instanceMatrix.needsUpdate = true;
-        if (m.instanceColor) m.instanceColor.needsUpdate = true;
-      }
+      this.debrisInstancedMesh.instanceMatrix.needsUpdate = true;
     }
 
     // Debris Velocity Arrows Instanced Rendering (1 draw call for all debris arrows, zero-allocation)
@@ -1114,12 +1059,17 @@ export class SceneView {
   }
 
   public setDualPaths(
-    crashPts: number[][] | null,
-    avoidPts: number[][] | null,
+    crashPts: [number, number, number][] | number[][] | null,
+    avoidPts: [number, number, number][] | number[][] | null,
     thrustVector?: [number, number, number] | null,
     satIndex: number = 0
   ): void {
-    // 1. Original default crash path (Dashed Blue Line #3B82F6)
+    const toVec = (p: number[]): THREE.Vector3 => {
+      const mag = Math.hypot(p[0], p[1], p[2]);
+      return mag < 2000 ? new THREE.Vector3(p[0], p[1], p[2]) : toScene(p);
+    };
+
+    // 1. Original default trajectory through encounter (Dashed Blue Line #3B82F6)
     if (this.crashLine) {
       this.dynamic.remove(this.crashLine);
       this.crashLine.geometry.dispose();
@@ -1128,7 +1078,8 @@ export class SceneView {
     if (crashPts && crashPts.length >= 2) {
       const ok = crashPts.filter(p => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite));
       if (ok.length >= 2) {
-        const g = new THREE.BufferGeometry().setFromPoints(ok.map(toScene));
+        const pts = ok.map(toVec);
+        const g = new THREE.BufferGeometry().setFromPoints(pts);
         this.crashLine = new THREE.Line(
           g,
           new THREE.LineDashedMaterial({
@@ -1136,7 +1087,7 @@ export class SceneView {
             dashSize: 0.8,
             gapSize: 0.5,
             transparent: true,
-            opacity: 0.75,
+            opacity: 0.55,
             depthWrite: false,
           })
         );
@@ -1154,7 +1105,8 @@ export class SceneView {
     if (avoidPts && avoidPts.length >= 2) {
       const ok = avoidPts.filter(p => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite));
       if (ok.length >= 2) {
-        const g = new THREE.BufferGeometry().setFromPoints(ok.map(toScene));
+        const pts = ok.map(toVec);
+        const g = new THREE.BufferGeometry().setFromPoints(pts);
         this.avoidLine = new THREE.Line(
           g,
           new THREE.LineBasicMaterial({
@@ -1403,12 +1355,12 @@ export class SceneView {
       l.geometry.dispose();
     }
     this._lines = [];
-    for (const b of this.debrisBuckets) {
-      this.dynamic.remove(b.mesh);
-      b.geometry.dispose();
-      b.material.dispose();
+    if (this.debrisInstancedMesh) {
+      this.dynamic.remove(this.debrisInstancedMesh);
+      this.debrisInstancedMesh.geometry.dispose();
+      (this.debrisInstancedMesh.material as THREE.Material).dispose();
+      this.debrisInstancedMesh = null;
     }
-    this.debrisBuckets = [];
     if (this.debrisPoints) {
       this.dynamic.remove(this.debrisPoints);
       this.debrisPoints.geometry.dispose();

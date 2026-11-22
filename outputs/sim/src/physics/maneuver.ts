@@ -173,3 +173,132 @@ export function planManeuver(
 
   return pick;
 }
+
+export interface AvoidanceTrajectoryEvaluation {
+  pos: [number, number, number];
+  defaultPos: [number, number, number];
+  defaultDir: [number, number, number];
+  avoidDir: [number, number, number];
+  inDodgeWindow: boolean;
+}
+
+export interface AvoidanceTrajectoryBundle {
+  defaultPoints: [number, number, number][];
+  avoidPoints: [number, number, number][];
+  evaluateAt: (simMs: number) => AvoidanceTrajectoryEvaluation;
+}
+
+/**
+ * Mathematically couples the unmaneuvered ISRO orbit and Engine 2 avoidance trajectory.
+ * Guarantees C^1 continuity at burn time, zero-gap branching, and exact tangent tracking.
+ *
+ * @param satBody Target protected satellite
+ * @param burnPlan Candidate maneuver with r0, v0, burnMs
+ * @param tcaMs Time of closest approach in epoch ms
+ * @param visualScale Magnification factor for human-scale visual clarity (default 18.0)
+ * @param samples Number of curve points to sample (default 96)
+ */
+export function sampleAvoidanceTrajectory(
+  satBody: SpaceBody,
+  burnPlan: { r0: [number, number, number]; v0: [number, number, number]; burnMs: number },
+  tcaMs: number,
+  visualScale = 18.0,
+  samples = 96
+): AvoidanceTrajectoryBundle {
+  const KM_TO_SCENE = 0.01;
+  const burnMs = burnPlan.burnMs;
+  const dtTcaMs = Math.max(1000, tcaMs - burnMs);
+  const totalDurationMs = dtTcaMs * 1.6;
+  const endMs = burnMs + totalDurationMs;
+
+  const toScene = (rKm: readonly number[]): [number, number, number] => [
+    rKm[0] * KM_TO_SCENE,
+    rKm[2] * KM_TO_SCENE,
+    -rKm[1] * KM_TO_SCENE,
+  ];
+
+  const computeStateKm = (t: number) => {
+    const defaultState = stateAt(satBody, t);
+    const defR: [number, number, number] = defaultState ? defaultState.r : burnPlan.r0;
+
+    if (t <= burnMs) {
+      return { defR, avoidR: defR };
+    }
+
+    const dtSec = (t - burnMs) / 1000;
+    const physState = twoBody(burnPlan.r0, burnPlan.v0, dtSec);
+    const physR = physState.r;
+
+    const deltaX = physR[0] - defR[0];
+    const deltaY = physR[1] - defR[1];
+    const deltaZ = physR[2] - defR[2];
+    const deltaNorm = Math.hypot(deltaX, deltaY, deltaZ);
+
+    const u = Math.min(1.0, Math.max(0.0, (t - burnMs) / dtTcaMs));
+    const w = 0.5 * (1.0 - Math.cos(Math.PI * u));
+
+    let effScale = visualScale;
+    if (deltaNorm > 1e-6 && effScale * deltaNorm > 180.0) {
+      effScale = 180.0 / deltaNorm;
+    }
+
+    const avoidR: [number, number, number] = [
+      defR[0] + deltaX * effScale * w,
+      defR[1] + deltaY * effScale * w,
+      defR[2] + deltaZ * effScale * w,
+    ];
+
+    return { defR, avoidR };
+  };
+
+  const defaultPoints: [number, number, number][] = [];
+  const avoidPoints: [number, number, number][] = [];
+
+  for (let i = 0; i < samples; i++) {
+    const t = burnMs + (totalDurationMs * i) / (samples - 1);
+    const { defR, avoidR } = computeStateKm(t);
+    defaultPoints.push(toScene(defR));
+    avoidPoints.push(toScene(avoidR));
+  }
+
+  const evaluateAt = (simMs: number): AvoidanceTrajectoryEvaluation => {
+    const deltaMs = 350;
+    const { defR, avoidR } = computeStateKm(simMs);
+    const pos = toScene(avoidR);
+    const defaultPos = toScene(defR);
+
+    // Default orbit tangent:
+    const prevDef = computeStateKm(simMs - deltaMs).defR;
+    const nextDef = computeStateKm(simMs + deltaMs).defR;
+    const dDefX = (nextDef[0] - prevDef[0]) * KM_TO_SCENE;
+    const dDefY = (nextDef[2] - prevDef[2]) * KM_TO_SCENE;
+    const dDefZ = -(nextDef[1] - prevDef[1]) * KM_TO_SCENE;
+    const dDefNorm = Math.hypot(dDefX, dDefY, dDefZ) || 1.0;
+    const defaultDir: [number, number, number] = [dDefX / dDefNorm, dDefY / dDefNorm, dDefZ / dDefNorm];
+
+    // Avoidance curve tangent (strictly following the green path):
+    const prevAvoid = computeStateKm(simMs - deltaMs).avoidR;
+    const nextAvoid = computeStateKm(simMs + deltaMs).avoidR;
+    const dAvX = (nextAvoid[0] - prevAvoid[0]) * KM_TO_SCENE;
+    const dAvY = (nextAvoid[2] - prevAvoid[2]) * KM_TO_SCENE;
+    const dAvZ = -(nextAvoid[1] - prevAvoid[1]) * KM_TO_SCENE;
+    const dAvNorm = Math.hypot(dAvX, dAvY, dAvZ) || 1.0;
+    const avoidDir: [number, number, number] = [dAvX / dAvNorm, dAvY / dAvNorm, dAvZ / dAvNorm];
+
+    const inDodgeWindow = simMs >= burnMs && simMs <= endMs;
+
+    return {
+      pos,
+      defaultPos,
+      defaultDir,
+      avoidDir,
+      inDodgeWindow,
+    };
+  };
+
+  return {
+    defaultPoints,
+    avoidPoints,
+    evaluateAt,
+  };
+}

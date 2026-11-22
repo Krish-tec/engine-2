@@ -23,6 +23,8 @@ import {
   computeAvoidanceUnitVector,
   isAvoidanceArrowVisible,
   COLLISION_RADIUS_KM,
+  sampleAvoidanceTrajectory,
+  type AvoidanceTrajectoryBundle,
 } from './physics';
 import { ConfigManager } from './config/ConfigManager';
 import type { SpaceBody, TLEEntry } from './types/orbital';
@@ -570,32 +572,27 @@ function updateThreat(sc: any): void {
     debIndex: sc.debIndex,
   });
 
-  // Calculate dual 3D trajectory paths (Blue default path + Green Engine 2 avoidance path)
-  if (isDanger && S.sats[sc.satIndex]) {
-    const satSt = stateAt(S.sats[sc.satIndex], S.simMs);
-    if (satSt) {
-      const crashPts: number[][] = [];
-      const avoidPts: number[][] = [];
-      const leadSec = Math.max(10, Math.min(60, tcaSec * 1.5));
-
-      // 1. Un-maneuvered default flight path (Blue) straight towards encounter
-      for (let k = 0; k <= 40; k++) {
-        const p = twoBody(satSt.r, satSt.v, (leadSec * k) / 40);
-        if (p && p.r.every(Number.isFinite)) crashPts.push(p.r);
-      }
-
-      // 2. Engine 2 Avoidance path (Green) curving safely outside 5 km
-      if (S.plan) {
-        for (let k = 0; k <= 40; k++) {
-          const a = twoBody(S.plan.r0, S.plan.v0, (leadSec * k) / 40);
-          if (a && a.r.every(Number.isFinite)) avoidPts.push(a.r);
-        }
-      }
-
-      const thrustVec = S.plan?.dvVec ? [S.plan.dvVec[0], S.plan.dvVec[1], S.plan.dvVec[2]] as [number, number, number] : null;
-      view.setDualPaths(crashPts, avoidPts, thrustVec, sc.satIndex);
+  // Calculate mathematically coupled dual 3D trajectory paths (Blue default path + Green Engine 2 avoidance path)
+  if (isDanger && S.sats[sc.satIndex] && S.plan) {
+    if (!currentAvoidanceBundle || currentAvoidanceSatIndex !== sc.satIndex) {
+      currentAvoidanceBundle = sampleAvoidanceTrajectory(
+        S.sats[sc.satIndex],
+        S.plan,
+        S.ev.t,
+        18.0,
+        96
+      );
+      currentAvoidanceSatIndex = sc.satIndex;
     }
+    view.setDualPaths(
+      currentAvoidanceBundle.defaultPoints,
+      currentAvoidanceBundle.avoidPoints,
+      null,
+      sc.satIndex
+    );
   } else if (!isDanger) {
+    currentAvoidanceBundle = null;
+    currentAvoidanceSatIndex = -1;
     view.clearDualPaths();
   }
 }
@@ -616,6 +613,8 @@ let lastFrameTime = performance.now();
 let lastDomUpdateTime = 0;
 let lastSatPositions: [number, number, number][] = [];
 let lastDebPositions: [number, number, number][] = [];
+let currentAvoidanceBundle: AvoidanceTrajectoryBundle | null = null;
+let currentAvoidanceSatIndex: number = -1;
 const prevCamPos = new THREE.Vector3();
 const prevCamTarget = new THREE.Vector3();
 
@@ -652,14 +651,27 @@ function loop(now: number): void {
     let st: any = stateAt(S.sats[i], S.simMs);
     const burn = S.burns[i];
     if (st && burn && S.simMs >= burn.at) {
-      st = twoBody(burn.plan.r0, burn.plan.v0, (S.simMs - burn.at) / 1000);
       if (!burn.fired) {
         burn.fired = true;
         view.firePlume(i);
       }
     }
+
+    let satV = st ? st.v : null;
+
+    // Mathematical coupling: satellite travels directly on the green curve during dodge!
+    if (currentAvoidanceBundle && currentAvoidanceSatIndex === i && S.autoDodgeEnabled) {
+      const evalRes = currentAvoidanceBundle.evaluateAt(S.simMs);
+      if (evalRes.inDodgeWindow) {
+        if (st) {
+          st = { ...st, rScene: evalRes.pos };
+        }
+        satV = evalRes.defaultDir;
+      }
+    }
+
     satStates[i] = st;
-    satVel[i] = st ? st.v : null;
+    satVel[i] = satV;
   }
 
   // Propagate Debris with position and velocity
@@ -723,7 +735,10 @@ function loop(now: number): void {
 
   // Dual Vector Arrows: Calculate Post-Burn Avoidance Vector & Smart Visibility
   let avoidanceVec: [number, number, number] | null = null;
-  if (S.plan && satStates[S.primary]) {
+  if (currentAvoidanceBundle && S.primary === currentAvoidanceSatIndex) {
+    const evalRes = currentAvoidanceBundle.evaluateAt(S.simMs);
+    avoidanceVec = evalRes.avoidDir; // Exact tangent of the green avoidance curve!
+  } else if (S.plan && satStates[S.primary]) {
     avoidanceVec = computeAvoidanceUnitVector(satStates[S.primary].v, S.plan.dvVec || [0, 1.8, 0]);
   }
   const isEncounterAlert = S.encounterState === 'approaching' || S.encounterState === 'burning';
@@ -808,6 +823,8 @@ function loop(now: number): void {
     else if (tcaSec <= -12) {
       S.encounterState = 'nominal';
       S.collisionTriggered = false;
+      currentAvoidanceBundle = null;
+      currentAvoidanceSatIndex = -1;
       view.clearDualPaths();
       ui.setLivePill('All Systems Nominal · Scanning LEO Orbit', 'nominal');
 
