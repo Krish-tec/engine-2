@@ -19,26 +19,26 @@
     "test:soak": "playwright test tests/e2e/soak.spec.ts"
   },
   "dependencies": {
-    "satellite.js": "^5.0.0",
-    "three": "^0.160.0"
+    "satellite.js": "^7.2.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.65.1",
     "@types/node": "^26.6.6",
-    "@types/three": "^0.160.0",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
-    "@vitest/coverage-v8": "^2.1.8",
-    "@vitest/ui": "^2.1.8",
-    "eslint": "^8.57.0",
+    "@types/three": "^0.187.0",
+    "@typescript-eslint/eslint-plugin": "^8.73.0",
+    "@typescript-eslint/parser": "^8.73.0",
+    "@vitest/coverage-v8": "^5.1.1",
+    "@vitest/ui": "^5.1.1",
+    "eslint": "^10.15.0",
     "eslint-plugin-security": "^4.2.1",
-    "jsdom": "^25.0.1",
+    "jsdom": "^31.0.1",
     "prettier": "^3.3.3",
     "rollup-plugin-visualizer": "^7.1.3",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.11",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
     "vite-plugin-compression": "^0.5.1",
-    "vitest": "^2.1.8"
+    "vitest": "^5.1.1"
   }
 }
