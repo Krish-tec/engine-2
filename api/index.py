@@ -14,15 +14,27 @@ from pathlib import Path
 import time as _time
 import requests as _requests
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+    HAS_SLOWAPI = True
+except Exception:
+    class DummyLimiter:
+        def limit(self, *args, **kwargs):
+            def decorator(f):
+                return f
+            return decorator
+    limiter = DummyLimiter()
+    _rate_limit_exceeded_handler = None
+    RateLimitExceeded = Exception
+    HAS_SLOWAPI = False
 
 logger = logging.getLogger(__name__)
 
 is_production = os.getenv("ENV") == "production"
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 app = FastAPI(
     title="UC096 Engine 2 — Space Debris CAM API",
     description="Collision Avoidance Maneuver optimization for LEO satellites",
@@ -30,8 +42,9 @@ app = FastAPI(
     docs_url=None if is_production else "/docs",
     redoc_url=None if is_production else "/redoc",
 )
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+if HAS_SLOWAPI:
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -73,6 +86,7 @@ if custom_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -420,8 +434,9 @@ def get_mission_control_ui():
         Path("/var/task"),
     ]
     candidates = []
-    # 1. Primary: new QuantumOrbit Sim production bundle
+    # 1. Primary: new QuantumOrbit Sim production bundle (dist or public CDN output)
     for b in base_dirs:
+        candidates.append(b / "public" / "index.html")
         candidates.append(b / "outputs" / "sim" / "dist" / "index.html")
         candidates.append(b / "sim" / "dist" / "index.html")
     # 2. Fallback: legacy mission_control.html
@@ -447,6 +462,9 @@ def get_mission_control_ui():
 
 # Mount static assets directory for the new Vite frontend if present
 for candidate in [
+    Path(__file__).resolve().parent.parent / "public" / "assets",
+    Path(__file__).resolve().parent / "public" / "assets",
+    Path.cwd() / "public" / "assets",
     Path(__file__).resolve().parent.parent / "outputs" / "sim" / "dist" / "assets",
     Path(__file__).resolve().parent / "outputs" / "sim" / "dist" / "assets",
     Path.cwd() / "outputs" / "sim" / "dist" / "assets",
