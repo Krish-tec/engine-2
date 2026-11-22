@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { KM } from './physics';
+import { Mulberry32 } from './physics/SimulationClock';
 import type { SpaceBody, StateVector, LifecycleState } from './types/orbital';
 
 const EXAG = 20;
@@ -18,12 +19,59 @@ function createArrowGeometry(): THREE.BufferGeometry {
 }
 
 export const COL = {
-  sat: 0xff4f00,
-  safe: 0x63e6a8,
+  sat: 0x3b82f6,
+  safe: 0x10b981,
   warn: 0xffc24b,
   crit: 0xff4136,
   dim: 0x8c9098,
 };
+
+export const DEBRIS_PALETTE = [
+  0x94a3b8, // Weathered aluminum (#94A3B8)
+  0x64748b, // Scorched titanium (#64748B)
+  0x475569, // Dark carbon composite (#475569)
+  0xc27803, // Torn gold Kapton foil (#C27803)
+  0xcbd5e1, // Pale ceramic / painted hull (#CBD5E1)
+];
+
+function createShardGeometry(prng: Mulberry32): THREE.BufferGeometry {
+  const geo = new THREE.DodecahedronGeometry(0.24, 0);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const s = prng.range(0.72, 1.28);
+    pos.setXYZ(i, pos.getX(i) * s, pos.getY(i) * s, pos.getZ(i) * s);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function createPanelGeometry(): THREE.BufferGeometry {
+  return new THREE.BoxGeometry(0.7, 0.04, 0.45);
+}
+
+function createCasingGeometry(): THREE.BufferGeometry {
+  return new THREE.CylinderGeometry(0.12, 0.14, 0.52, 10);
+}
+
+function createStrutGeometry(prng: Mulberry32): THREE.BufferGeometry {
+  const geo = new THREE.OctahedronGeometry(0.22, 0);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const sx = prng.range(0.65, 0.95);
+    const sy = prng.range(1.65, 2.35);
+    const sz = prng.range(0.65, 0.95);
+    pos.setXYZ(i, pos.getX(i) * sx, pos.getY(i) * sy, pos.getZ(i) * sz);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+export interface DebrisBucket {
+  mesh: THREE.InstancedMesh;
+  geometry: THREE.BufferGeometry;
+  material: THREE.Material;
+  capacity: number;
+}
 
 export const toScene = (r: number[]): THREE.Vector3 => new THREE.Vector3(r[0] * KM, r[2] * KM, -r[1] * KM);
 const SAFE_UNIT = 5 * KM * EXAG;
@@ -152,12 +200,31 @@ export class SceneView {
   private threatRing!: THREE.Sprite;
   private debrisPoints: THREE.Points | null = null;
   private debrisArrowInstancedMesh: THREE.InstancedMesh | null = null;
+  public debrisBuckets: DebrisBucket[] = [];
   private activeCollisions: ActiveCollisionEffect[] = [];
   private selectedDebrisMesh: THREE.Mesh | null = null;
   private _lines: THREE.Line[] = [];
   private _plumeT?: number;
   private _tmp: THREE.Vector3 = new THREE.Vector3();
   private _isEco: boolean = false;
+
+  // Debris Multi-Archetype Per-Instance State Arrays
+  private _debBucket: Uint8Array = new Uint8Array(0);
+  private _debSlot: Uint16Array = new Uint16Array(0);
+  private _debScaleX: Float32Array = new Float32Array(0);
+  private _debScaleY: Float32Array = new Float32Array(0);
+  private _debScaleZ: Float32Array = new Float32Array(0);
+  private _debRotX: Float32Array = new Float32Array(0);
+  private _debRotY: Float32Array = new Float32Array(0);
+  private _debRotZ: Float32Array = new Float32Array(0);
+  private _debSpinX: Float32Array = new Float32Array(0);
+  private _debSpinY: Float32Array = new Float32Array(0);
+  private _debSpinZ: Float32Array = new Float32Array(0);
+  private _debBaseColor: THREE.Color[] = [];
+
+  // Dual-Path Smart Opacity Smoothing
+  private _avoidPathOpacity: number = 0;
+  private _avoidTargetOpacity: number = 0;
 
   // Hoisted scratch variables to eliminate GC pressure and per-frame allocations
   private _dummyMat: THREE.Matrix4 = new THREE.Matrix4();
@@ -171,6 +238,8 @@ export class SceneView {
   private _shrapnelS: THREE.Vector3 = new THREE.Vector3();
   private _deltaEuler: THREE.Euler = new THREE.Euler();
   private _deltaQ: THREE.Quaternion = new THREE.Quaternion();
+  private _scratchEuler: THREE.Euler = new THREE.Euler();
+  private _scratchCol: THREE.Color = new THREE.Color();
 
   public onContextLost?: () => void;
   public onContextRestored?: () => void;
@@ -404,6 +473,12 @@ export class SceneView {
       l.geometry.dispose();
     }
     this._lines = [];
+    for (const b of this.debrisBuckets) {
+      this.dynamic.remove(b.mesh);
+      b.geometry.dispose();
+      b.material.dispose();
+    }
+    this.debrisBuckets = [];
     if (this.debrisPoints) {
       this.dynamic.remove(this.debrisPoints);
       this.debrisPoints.geometry.dispose();
@@ -559,9 +634,9 @@ export class SceneView {
       const line = new THREE.Line(
         lineGeo,
         new THREE.LineBasicMaterial({
-          color: i === 0 ? 0xff4f00 : 0x6fa8ff,
+          color: 0x3b82f6,
           transparent: true,
-          opacity: i === 0 ? 0.5 : 0.28,
+          opacity: i === 0 ? 0.65 : 0.35,
           depthWrite: false,
         })
       );
@@ -610,52 +685,86 @@ export class SceneView {
       });
     });
 
-    // 7. Faceted Irregular 3D Debris Mesh for Micro-Inspection
-    if (this.selectedDebrisMesh) {
-      this.dynamic.remove(this.selectedDebrisMesh);
-      this.selectedDebrisMesh.geometry.dispose();
-      this.selectedDebrisMesh = null;
-    }
-    const debrisGeo = new THREE.DodecahedronGeometry(0.26, 1);
-    const posAttr = debrisGeo.attributes.position;
-    for (let v = 0; v < posAttr.count; v++) {
-      const rx = 1.0 + Math.sin(v * 3.7) * 0.22;
-      const ry = 1.0 + Math.cos(v * 2.3) * 0.18;
-      const rz = 1.0 + Math.sin(v * 5.1) * 0.2;
-      posAttr.setXYZ(v, posAttr.getX(v) * rx, posAttr.getY(v) * ry, posAttr.getZ(v) * rz);
-    }
-    debrisGeo.computeVertexNormals();
-    const debrisMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8,
-      metalness: 0.8,
-      roughness: 0.38,
-      flatShading: true,
-    });
-    this.selectedDebrisMesh = new THREE.Mesh(debrisGeo, debrisMat);
-    this.selectedDebrisMesh.visible = false;
-    this.dynamic.add(this.selectedDebrisMesh);
-
+    // 7. Multi-Shape 3D Debris (4 Distinct Instanced Archetypes, Seeded & Deterministic)
     const cap = debrisBodies.length;
-    const pos = new Float32Array(cap * 3);
-    const col = new Float32Array(cap * 3);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    this.debrisPoints = new THREE.Points(
-      geo,
-      new THREE.PointsMaterial({
-        size: 0.42,
-        map: this.dotTex,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.95,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-      })
-    );
-    this.debrisPoints.frustumCulled = false;
-    this.dynamic.add(this.debrisPoints);
+    this._debBucket = new Uint8Array(cap);
+    this._debSlot = new Uint16Array(cap);
+    this._debScaleX = new Float32Array(cap);
+    this._debScaleY = new Float32Array(cap);
+    this._debScaleZ = new Float32Array(cap);
+    this._debRotX = new Float32Array(cap);
+    this._debRotY = new Float32Array(cap);
+    this._debRotZ = new Float32Array(cap);
+    this._debSpinX = new Float32Array(cap);
+    this._debSpinY = new Float32Array(cap);
+    this._debSpinZ = new Float32Array(cap);
+    this._debBaseColor = [];
+
+    const prng = new Mulberry32(1337);
+    const bucketCounts = [0, 0, 0, 0];
+
+    for (let i = 0; i < cap; i++) {
+      const r = prng.next();
+      let b = 0;
+      if (r < 0.35) b = 0; // ~35% Jagged Shards
+      else if (r < 0.60) b = 1; // ~25% Broken Solar Panels
+      else if (r < 0.80) b = 2; // ~20% Rocket Casings / Tanks
+      else b = 3; // ~20% Twisted Struts
+
+      this._debBucket[i] = b;
+      this._debSlot[i] = bucketCounts[b];
+      bucketCounts[b]++;
+
+      this._debScaleX[i] = prng.range(0.55, 1.85);
+      this._debScaleY[i] = prng.range(0.55, 1.85);
+      this._debScaleZ[i] = prng.range(0.55, 1.85);
+
+      this._debRotX[i] = prng.range(0, Math.PI * 2);
+      this._debRotY[i] = prng.range(0, Math.PI * 2);
+      this._debRotZ[i] = prng.range(0, Math.PI * 2);
+
+      const speed = prng.range(0.15, 2.4);
+      const dx = prng.range(-1, 1);
+      const dy = prng.range(-1, 1);
+      const dz = prng.range(-1, 1);
+      const dLen = Math.hypot(dx, dy, dz) || 1;
+      this._debSpinX[i] = (dx / dLen) * speed;
+      this._debSpinY[i] = (dy / dLen) * speed;
+      this._debSpinZ[i] = (dz / dLen) * speed;
+
+      const colHex = DEBRIS_PALETTE[Math.floor(prng.next() * DEBRIS_PALETTE.length)];
+      this._debBaseColor[i] = new THREE.Color(colHex);
+    }
+
+    const shardGeo = createShardGeometry(prng);
+    const panelGeo = createPanelGeometry();
+    const casingGeo = createCasingGeometry();
+    const strutGeo = createStrutGeometry(prng);
+
+    const geos = [shardGeo, panelGeo, casingGeo, strutGeo];
+    const mats = [
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.85, roughness: 0.35, flatShading: true }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.9, roughness: 0.22, flatShading: true }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.78, roughness: 0.38, flatShading: true }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.45, flatShading: true }),
+    ];
+
+    this.debrisBuckets = geos.map((g, bIdx) => {
+      const count = Math.max(1, bucketCounts[bIdx]);
+      const mesh = new THREE.InstancedMesh(g, mats[bIdx], count);
+      mesh.frustumCulled = false;
+      this.dynamic.add(mesh);
+      return { mesh, geometry: g, material: mats[bIdx], capacity: count };
+    });
+
+    for (let i = 0; i < cap; i++) {
+      const b = this._debBucket[i];
+      const slot = this._debSlot[i];
+      this.debrisBuckets[b].mesh.setColorAt(slot, this._debBaseColor[i]);
+    }
+    this.debrisBuckets.forEach(b => {
+      if (b.mesh.instanceColor) b.mesh.instanceColor.needsUpdate = true;
+    });
 
     const debArrowGeo = createArrowGeometry();
     const debArrowMat = new THREE.MeshBasicMaterial({
@@ -668,17 +777,18 @@ export class SceneView {
     this.debrisArrowInstancedMesh.frustumCulled = false;
     this.dynamic.add(this.debrisArrowInstancedMesh);
 
-    this.debris = debrisBodies.map((b, i) => ({ body: b, index: i, color: new THREE.Color(COL.dim) }));
+    this.debris = debrisBodies.map((b, i) => ({ body: b, index: i, color: this._debBaseColor[i] }));
   }
 
   public update({
     sats,
     debris,
     gmstAngle,
+    threatIdx = -1,
     threatPos = null,
     selected = null,
     burnPath = null,
-    debrisUpdated = true,
+    debrisUpdated: _debrisUpdated = true,
     dtReal = 0.016,
     satVelocities = [],
     debrisVelocities = [],
@@ -738,21 +848,31 @@ export class SceneView {
         }
       }
 
-      // 2. Green Avoidance Maneuver Arrow (Context-aware smart visibility)
+      // 2. Green Avoidance Maneuver Arrow (Context-aware smart visibility & smooth fade)
       if (s.greenAvoidArrow) {
         const isTargetSat = (selected?.sat ?? 0) === i;
-        if (isVisible && isTargetSat && avoidanceVisible && avoidanceVec) {
+        if (isVisible && isTargetSat && avoidanceVisible && avoidanceVec && this._avoidPathOpacity > 0.01) {
           const aScene = toScene(avoidanceVec).normalize();
           s.greenAvoidArrow.position.copy(p);
           s.greenAvoidArrow.quaternion.setFromUnitVectors(UP, aScene);
           const greenScale = arrowScale * 1.15;
           s.greenAvoidArrow.scale.set(greenScale, greenScale, greenScale);
+          (s.greenAvoidArrow.material as THREE.MeshStandardMaterial).opacity = this._avoidPathOpacity;
           s.greenAvoidArrow.visible = true;
         } else {
           s.greenAvoidArrow.visible = false;
         }
       }
     });
+
+    // Smooth opacity transition for avoidance path line and green avoidance arrow
+    this._avoidTargetOpacity = avoidanceVisible ? 0.95 : 0.0;
+    this._avoidPathOpacity += (this._avoidTargetOpacity - this._avoidPathOpacity) * Math.min(1.0, dtReal * 5.0);
+    if (this.avoidLine) {
+      (this.avoidLine.material as THREE.LineBasicMaterial).opacity = this._avoidPathOpacity;
+      this.avoidLine.visible = this._avoidPathOpacity > 0.01;
+    }
+
     if (this.earthGroup) this.earthGroup.rotation.y = gmstAngle;
 
     if (this.thrustArrow) {
@@ -784,23 +904,49 @@ export class SceneView {
       }
     }
 
-    const geo = this.debrisPoints?.geometry;
-    if (geo && debrisUpdated) {
-      const pa = geo.attributes.position.array as Float32Array;
-      const ca = geo.attributes.color.array as Float32Array;
-      debris.forEach((p, i) => {
-        if (!p) return;
-        pa[i * 3] = p[0] * KM;
-        pa[i * 3 + 1] = p[2] * KM;
-        pa[i * 3 + 2] = -p[1] * KM;
-        const c = this.debris[i].color;
-        ca[i * 3] = c.r;
-        ca[i * 3 + 1] = c.g;
-        ca[i * 3 + 2] = c.b;
-      });
-      geo.attributes.position.needsUpdate = true;
-      geo.attributes.color.needsUpdate = true;
-      geo.setDrawRange(0, Math.min(this.activeDebris, debris.length));
+    // Update Multi-Shape Tumbling 3D Space Debris (4 distinct instanced archetypes, zero per-frame allocation)
+    if (this.debrisBuckets.length === 4) {
+      const maxDeb = Math.min(this.activeDebris, debris.length);
+      const cap = this._debBucket.length;
+
+      for (let i = 0; i < cap; i++) {
+        const pKm = debris[i];
+        const b = this._debBucket[i];
+        const slot = this._debSlot[i];
+        const bucketMesh = this.debrisBuckets[b]?.mesh;
+        if (!bucketMesh) continue;
+
+        if (i < maxDeb && pKm) {
+          // Advance independent 3-axis tumble rotation
+          this._debRotX[i] += this._debSpinX[i] * dtReal;
+          this._debRotY[i] += this._debSpinY[i] * dtReal;
+          this._debRotZ[i] += this._debSpinZ[i] * dtReal;
+
+          this._scratchEuler.set(this._debRotX[i], this._debRotY[i], this._debRotZ[i]);
+          this._dummyQuat.setFromEuler(this._scratchEuler);
+          this._dummyPos.set(pKm[0] * KM, pKm[2] * KM, -pKm[1] * KM);
+          this._dummyScale.set(this._debScaleX[i], this._debScaleY[i], this._debScaleZ[i]);
+          this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._dummyScale);
+          bucketMesh.setMatrixAt(slot, this._dummyMat);
+
+          // Highlight active threat debris with warm orange tint
+          if (threatIdx === i) {
+            this._scratchCol.setHex(0xf97316);
+            bucketMesh.setColorAt(slot, this._scratchCol);
+          } else {
+            bucketMesh.setColorAt(slot, this._debBaseColor[i]);
+          }
+        } else {
+          this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._zeroScale);
+          bucketMesh.setMatrixAt(slot, this._dummyMat);
+        }
+      }
+
+      for (let b = 0; b < 4; b++) {
+        const m = this.debrisBuckets[b].mesh;
+        m.instanceMatrix.needsUpdate = true;
+        if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      }
     }
 
     // Debris Velocity Arrows Instanced Rendering (1 draw call for all debris arrows, zero-allocation)
@@ -926,16 +1072,7 @@ export class SceneView {
       const p = toScene(threatPos);
       this.threatRing.visible = true;
       this.threatRing.position.copy(p);
-      const near = this.sats[selected?.sat ?? 0];
-      if (near) {
-        const arr = this.linkLine.geometry.attributes.position;
-        arr.setXYZ(0, near.group.position.x, near.group.position.y, near.group.position.z);
-        arr.setXYZ(1, p.x, p.y, p.z);
-        arr.needsUpdate = true;
-        this.linkLine.geometry.computeBoundingSphere();
-        this.linkLine.computeLineDistances();
-        this.linkLine.visible = true;
-      }
+      this.linkLine.visible = false; // Never draw Earth-piercing connector chord
     } else {
       this.threatRing.visible = false;
       this.linkLine.visible = false;
@@ -982,7 +1119,7 @@ export class SceneView {
     thrustVector?: [number, number, number] | null,
     satIndex: number = 0
   ): void {
-    // 1. Original default crash path (Red Dashed Line)
+    // 1. Original default crash path (Dashed Blue Line #3B82F6)
     if (this.crashLine) {
       this.dynamic.remove(this.crashLine);
       this.crashLine.geometry.dispose();
@@ -995,11 +1132,11 @@ export class SceneView {
         this.crashLine = new THREE.Line(
           g,
           new THREE.LineDashedMaterial({
-            color: 0xef4444,
+            color: 0x3b82f6,
             dashSize: 0.8,
             gapSize: 0.5,
             transparent: true,
-            opacity: 0.9,
+            opacity: 0.75,
             depthWrite: false,
           })
         );
@@ -1008,7 +1145,7 @@ export class SceneView {
       }
     }
 
-    // 2. Engine 2 Avoidance Path (Solid Glowing Emerald-Green Line)
+    // 2. Engine 2 Avoidance Path (Solid Glowing Emerald-Green Line #10B981)
     if (this.avoidLine) {
       this.dynamic.remove(this.avoidLine);
       this.avoidLine.geometry.dispose();
@@ -1021,12 +1158,13 @@ export class SceneView {
         this.avoidLine = new THREE.Line(
           g,
           new THREE.LineBasicMaterial({
-            color: 0x22c55e,
+            color: 0x10b981,
             transparent: true,
-            opacity: 0.95,
+            opacity: this._avoidPathOpacity,
             depthWrite: false,
           })
         );
+        this.avoidLine.visible = this._avoidPathOpacity > 0.01;
         this.dynamic.add(this.avoidLine);
       }
     }
@@ -1045,7 +1183,7 @@ export class SceneView {
           tScene,
           satPos,
           2.6,
-          0x22c55e,
+          0x10b981,
           0.8,
           0.45
         );
@@ -1265,6 +1403,12 @@ export class SceneView {
       l.geometry.dispose();
     }
     this._lines = [];
+    for (const b of this.debrisBuckets) {
+      this.dynamic.remove(b.mesh);
+      b.geometry.dispose();
+      b.material.dispose();
+    }
+    this.debrisBuckets = [];
     if (this.debrisPoints) {
       this.dynamic.remove(this.debrisPoints);
       this.debrisPoints.geometry.dispose();

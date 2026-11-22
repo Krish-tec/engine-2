@@ -570,7 +570,7 @@ function updateThreat(sc: any): void {
     debIndex: sc.debIndex,
   });
 
-  // Calculate dual 3D trajectory paths (Red unmaneuvered crash path + Green Engine 2 avoidance path)
+  // Calculate dual 3D trajectory paths (Blue default path + Green Engine 2 avoidance path)
   if (isDanger && S.sats[sc.satIndex]) {
     const satSt = stateAt(S.sats[sc.satIndex], S.simMs);
     if (satSt) {
@@ -578,13 +578,13 @@ function updateThreat(sc: any): void {
       const avoidPts: number[][] = [];
       const leadSec = Math.max(10, Math.min(60, tcaSec * 1.5));
 
-      // 1. Un-maneuvered path straight towards the debris
+      // 1. Un-maneuvered default flight path (Blue) straight towards encounter
       for (let k = 0; k <= 40; k++) {
         const p = twoBody(satSt.r, satSt.v, (leadSec * k) / 40);
         if (p && p.r.every(Number.isFinite)) crashPts.push(p.r);
       }
 
-      // 2. Engine 2 Avoidance path curving safely outside 5 km
+      // 2. Engine 2 Avoidance path (Green) curving safely outside 5 km
       if (S.plan) {
         for (let k = 0; k <= 40; k++) {
           const a = twoBody(S.plan.r0, S.plan.v0, (leadSec * k) / 40);
@@ -595,6 +595,8 @@ function updateThreat(sc: any): void {
       const thrustVec = S.plan?.dvVec ? [S.plan.dvVec[0], S.plan.dvVec[1], S.plan.dvVec[2]] as [number, number, number] : null;
       view.setDualPaths(crashPts, avoidPts, thrustVec, sc.satIndex);
     }
+  } else if (!isDanger) {
+    view.clearDualPaths();
   }
 }
 
