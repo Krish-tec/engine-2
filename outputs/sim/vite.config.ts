@@ -38,6 +38,14 @@ export default defineConfig({
     target: 'es2022',
     outDir: 'dist',
     assetsInlineLimit: 4096,
-    chunkSizeWarningLimit: 600
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-three': ['three'],
+          'vendor-sgp4': ['satellite.js'],
+        },
+      },
+    },
   }
 });

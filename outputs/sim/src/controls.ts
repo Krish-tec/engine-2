@@ -68,6 +68,7 @@ export class OrbitRig {
   public onFocusConjunction?: () => void;
 
   private _persp: THREE.PerspectiveCamera;
+  private _abortController: AbortController = new AbortController();
   private _dragState: {
     startX: number;
     startY: number;
@@ -143,8 +144,9 @@ export class OrbitRig {
 
   private _bind(): void {
     const d = this.dom;
+    const signal = this._abortController.signal;
 
-    d.addEventListener('contextmenu', (e) => e.preventDefault());
+    d.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
 
     // Pointer events: Trackpad + Mouse + Touch
     d.addEventListener('pointerdown', (e: PointerEvent) => {
@@ -187,7 +189,7 @@ export class OrbitRig {
         // Safe fallback
       }
       d.classList.add('dragging');
-    });
+    }, { signal });
 
     d.addEventListener('pointermove', (e: PointerEvent) => {
       if (!this._dragState || this._dragState.pointerId !== e.pointerId) return;
@@ -213,7 +215,7 @@ export class OrbitRig {
       } else {
         this.orbit(dx, dy);
       }
-    });
+    }, { signal });
 
     const finishPointer = (e: PointerEvent) => {
       if (this._dragState && this._dragState.pointerId === e.pointerId) {
@@ -227,8 +229,8 @@ export class OrbitRig {
       }
     };
 
-    d.addEventListener('pointerup', finishPointer);
-    d.addEventListener('pointercancel', finishPointer);
+    d.addEventListener('pointerup', finishPointer, { signal });
+    d.addEventListener('pointercancel', finishPointer, { signal });
 
     // Trackpad scroll & mouse wheel with exponential distance scaling
     d.addEventListener(
@@ -253,7 +255,7 @@ export class OrbitRig {
           this.zoom(e.deltaY * scale);
         }
       },
-      { passive: false }
+      { signal, passive: false }
     );
 
     // Double click to focus or reset
@@ -264,7 +266,7 @@ export class OrbitRig {
       if (this.onDblClick) {
         this.onDblClick(ndcX, ndcY);
       }
-    });
+    }, { signal });
 
     // Touch events
     let touchDist0 = 0;
@@ -289,7 +291,7 @@ export class OrbitRig {
           };
         }
       },
-      { passive: true }
+      { signal, passive: true }
     );
 
     d.addEventListener(
@@ -316,11 +318,11 @@ export class OrbitRig {
           touchMid0 = mid1;
         }
       },
-      { passive: true }
+      { signal, passive: true }
     );
 
     // Keyboard navigation
-    addEventListener('keydown', (e: KeyboardEvent) => this._keys(e));
+    addEventListener('keydown', (e: KeyboardEvent) => this._keys(e), { signal });
   }
 
   private _keys(e: KeyboardEvent): void {
@@ -766,6 +768,10 @@ export class OrbitRig {
     }
 
     return this.isMoving;
+  }
+
+  public dispose(): void {
+    this._abortController.abort();
   }
 }
 

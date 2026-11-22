@@ -266,8 +266,21 @@ function computeApproaches(satIndex: number): any[] {
   if (!satB) return out;
   const maxDeb = Math.min(S.debN, S.debris.length);
   for (let i = 0; i < maxDeb; i++) {
-    const ev = findApproach(satB, S.debris[i], S.t0, 12);
+    const debB = S.debris[i];
+    // Astrodynamic orbital shell pre-filter:
+    // Prune debris whose nominal altitude difference exceeds 200 km unless synthetic encounter target
+    if (satB.alt && debB.alt && Math.abs(satB.alt - debB.alt) > 200 && !(debB as any)._synth) {
+      continue;
+    }
+    const ev = findApproach(satB, debB, S.t0, 12);
     if (ev && isFinite(ev.miss)) out.push({ debIndex: i, ev });
+  }
+  // Fallback in case altitude pre-filtering yielded zero candidates (e.g. custom or sparse catalogs)
+  if (out.length === 0 && maxDeb > 0) {
+    for (let i = 0; i < Math.min(10, maxDeb); i++) {
+      const ev = findApproach(satB, S.debris[i], S.t0, 12);
+      if (ev && isFinite(ev.miss)) out.push({ debIndex: i, ev });
+    }
   }
   out.sort((a, b) => a.ev.miss - b.ev.miss);
   S.approaches[satIndex] = out;

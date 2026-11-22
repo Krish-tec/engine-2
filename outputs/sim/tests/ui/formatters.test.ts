@@ -9,6 +9,7 @@ import {
   fmtTimeToTca,
   fmtLeadTime,
   fmtAge,
+  escapeHtml,
 } from '../../src/ui/formatters';
 
 describe('UI Formatters & Risk Classification', () => {
@@ -55,6 +56,19 @@ describe('UI Formatters & Risk Classification', () => {
     it('handles invalid inputs', () => {
       expect(formatDv(null)).toBe('—');
       expect(formatDv(NaN)).toBe('—');
+    });
+  });
+
+  describe('escapeHtml', () => {
+    it('escapes special HTML characters', () => {
+      expect(escapeHtml('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+      expect(escapeHtml("Tom & 'Jerry'")).toBe('Tom &amp; &#39;Jerry&#39;');
+    });
+
+    it('handles null, undefined, and non-string inputs safely', () => {
+      expect(escapeHtml(null)).toBe('');
+      expect(escapeHtml(undefined)).toBe('');
+      expect(escapeHtml(123 as any)).toBe('123');
     });
   });
 

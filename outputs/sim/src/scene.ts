@@ -394,7 +394,11 @@ export class SceneView {
     stateAtFunc: (body: SpaceBody, t: number) => StateVector | null,
     t0: number
   ): void {
-    while (this.satGroup.children.length) this.satGroup.remove(this.satGroup.children[0]);
+    while (this.satGroup.children.length) {
+      const child = this.satGroup.children[0];
+      this._disposeHierarchy(child);
+      this.satGroup.remove(child);
+    }
     for (const l of this._lines || []) {
       this.dynamic.remove(l);
       l.geometry.dispose();
@@ -1229,5 +1233,58 @@ export class SceneView {
 
   public render(): void {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private _disposeHierarchy(obj: THREE.Object3D): void {
+    obj.traverse((child: any) => {
+      if (child.geometry) {
+        child.geometry.dispose();
+      }
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m: any) => {
+            if (m.map) m.map.dispose();
+            m.dispose();
+          });
+        } else {
+          if (child.material.map) child.material.map.dispose();
+          child.material.dispose();
+        }
+      }
+    });
+  }
+
+  public dispose(): void {
+    while (this.satGroup.children.length) {
+      const child = this.satGroup.children[0];
+      this._disposeHierarchy(child);
+      this.satGroup.remove(child);
+    }
+    for (const l of this._lines || []) {
+      this.dynamic.remove(l);
+      l.geometry.dispose();
+    }
+    this._lines = [];
+    if (this.debrisPoints) {
+      this.dynamic.remove(this.debrisPoints);
+      this.debrisPoints.geometry.dispose();
+      this.debrisPoints = null;
+    }
+    if (this.debrisArrowInstancedMesh) {
+      this.dynamic.remove(this.debrisArrowInstancedMesh);
+      this.debrisArrowInstancedMesh.geometry.dispose();
+      this.debrisArrowInstancedMesh = null;
+    }
+    for (const col of this.activeCollisions) {
+      this.dynamic.remove(col.flashMesh);
+      col.flashMesh.geometry.dispose();
+      this.dynamic.remove(col.ringMesh);
+      col.ringMesh.geometry.dispose();
+      this.dynamic.remove(col.shrapnelMesh);
+      col.shrapnelMesh.geometry.dispose();
+    }
+    this.activeCollisions = [];
+    this.clearDualPaths();
+    this.renderer.dispose();
   }
 }

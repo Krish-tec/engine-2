@@ -405,10 +405,14 @@ def _optimize(inp: ConjunctionInput) -> ManeuverOutput:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+_cached_ui_html: Optional[str] = None
+_cached_ui_mtime: float = 0.0
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/ui", response_class=HTMLResponse)
 def get_mission_control_ui():
     """Serve the modern QuantumOrbit Conjunction Desk UI, falling back to legacy mission_control.html if dist/ not built."""
+    global _cached_ui_html, _cached_ui_mtime
     base_dirs = [
         Path(__file__).resolve().parent.parent,
         Path(__file__).resolve().parent,
@@ -429,8 +433,13 @@ def get_mission_control_ui():
     for p in candidates:
         try:
             if p.is_file():
+                mtime = p.stat().st_mtime
+                if _cached_ui_html is not None and mtime == _cached_ui_mtime:
+                    return _cached_ui_html
                 with open(p, "r", encoding="utf-8") as f:
-                    return f.read()
+                    _cached_ui_html = f.read()
+                    _cached_ui_mtime = mtime
+                    return _cached_ui_html
         except Exception:
             pass
     return "<h1>QuantumOrbit Sim UI not found. Run 'npm run build' in outputs/sim/.</h1>"
@@ -577,9 +586,13 @@ async def get_live_debris_catalog(request: Request = None):
     return result
 
 
+_cached_benchmark: Optional[dict] = None
+_cached_benchmark_mtime: float = 0.0
+
 @app.get("/api/v1/engine2/benchmark")
 def get_benchmark():
     """Return latest benchmark metrics produced by ``main.py``."""
+    global _cached_benchmark, _cached_benchmark_mtime
     base_dirs = [
         Path(__file__).resolve().parent.parent,
         Path(__file__).resolve().parent,
@@ -595,8 +608,13 @@ def get_benchmark():
     for p in candidates:
         try:
             if p.is_file():
+                mtime = p.stat().st_mtime
+                if _cached_benchmark is not None and mtime == _cached_benchmark_mtime:
+                    return _cached_benchmark
                 with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    _cached_benchmark = json.load(f)
+                    _cached_benchmark_mtime = mtime
+                    return _cached_benchmark
         except Exception:
             pass
     raise HTTPException(

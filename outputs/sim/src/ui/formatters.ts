@@ -62,6 +62,19 @@ export function fmtLeadTime(burnMin: number): string {
   return `${fmt(burnMin / 60, 2)} h`;
 }
 
+/**
+ * Escapes untrusted user or remote strings for safe DOM embedding.
+ */
+export function escapeHtml(str: string | undefined | null): string {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Aliases matching specification
 export {
   fmtPc as formatPc,

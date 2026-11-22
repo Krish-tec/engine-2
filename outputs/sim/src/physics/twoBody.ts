@@ -34,6 +34,7 @@ export function twoBody(
     const S = stumpffS(z);
     const F = (rv / sqMu) * x * x * C + (1 - alpha * r0n) * x * x * x * S + r0n * x - sqMu * dt;
     const dF = (rv / sqMu) * x * (1 - z * S) + (1 - alpha * r0n) * x * x * C + r0n;
+    if (Math.abs(dF) < 1e-15) break;
     const dx = F / dF;
     x -= dx;
     if (Math.abs(dx) < 1e-10) break;

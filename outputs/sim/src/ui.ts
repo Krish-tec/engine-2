@@ -1,5 +1,5 @@
 import type { SpaceBody, RTNCoords } from './types/orbital';
-import { fmt, fmtMiss, fmtRelSpeed } from './ui/formatters';
+import { fmt, fmtMiss, fmtRelSpeed, escapeHtml } from './ui/formatters';
 import type { RiskLevel } from './ui/riskClassifier';
 import { filterObjects, type CatalogRowItem } from './ui/filters';
 
@@ -203,7 +203,7 @@ export class UI {
       <div class="obj${this.sel && this.sel.kind === o.kind && this.sel.index === o.index ? ' sel' : ''}${isDestroyed ? ' destroyed' : ''}"
            role="option" data-kind="${o.kind}" data-index="${o.index}" data-risk="${o.risk}">
         <i class="dot"></i>
-        <div class="nm">${o.name}</div>
+        <div class="nm">${escapeHtml(o.name)}</div>
         <span class="pill ${pillClass}">
           ${pillText}
         </span>
