@@ -2,7 +2,7 @@
 # For local or GPU training pipelines: pip install -r requirements-training.txt
 -r requirements.txt
 pandas>=2.0.0
-scipy>=1.10.0
+scipy>=1.15.3
 scikit-learn>=1.3.0
 xgboost>=2.0.0
 torch>=2.1.0
