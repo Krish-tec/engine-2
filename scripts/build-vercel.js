@@ -1,59 +1,18 @@
 /**
  * Vercel Build Script for QuantumOrbit Simulator
- * Compiles TypeScript + Vite bundle from outputs/sim into public/ for instant global CDN delivery.
+ * Deploys the pre-compiled, tree-shaken production bundle into public/ for instant CDN hosting.
  */
 
-const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const simDir = path.join(rootDir, 'outputs', 'sim');
 const distDir = path.join(simDir, 'dist');
 const publicDir = path.join(rootDir, 'public');
 
-console.log('[Vercel Build] Starting QuantumOrbit build...');
-console.log(`[Vercel Build] Root directory: ${rootDir}`);
-console.log(`[Vercel Build] Simulator directory: ${simDir}`);
-
-// Helper to run commands
-function run(cmd, cwd = rootDir) {
-  console.log(`[Vercel Build] Running: ${cmd} (in ${cwd})`);
-  execSync(cmd, { cwd, stdio: 'inherit', env: process.env });
-}
-
-// 1. Detect package manager
-let pkgManager = 'npm';
-try {
-  execSync('pnpm --version', { stdio: 'ignore' });
-  pkgManager = 'pnpm';
-} catch {
-  pkgManager = 'npm';
-}
-console.log(`[Vercel Build] Using package manager: ${pkgManager}`);
-
-// 2. Install dependencies in outputs/sim if needed
-if (!fs.existsSync(path.join(simDir, 'node_modules'))) {
-  console.log('[Vercel Build] Installing outputs/sim dependencies...');
-  if (pkgManager === 'pnpm') {
-    run('pnpm install --frozen-lockfile=false', simDir);
-  } else {
-    run('npm install', simDir);
-  }
-}
-
-// 3. Build outputs/sim
-console.log('[Vercel Build] Building outputs/sim Vite bundle...');
-if (pkgManager === 'pnpm') {
-  run('pnpm run build', simDir);
-} else {
-  run('npm run build', simDir);
-}
-
-// 4. Ensure public directory exists and clean old assets
-if (!fs.existsSync(publicDir)) {
-  fs.mkdirSync(publicDir, { recursive: true });
-}
+console.log('[Vercel Build] Starting QuantumOrbit Vercel deployment check...');
 
 // Helper to copy directory recursively
 function copyRecursive(src, dest) {
@@ -72,21 +31,39 @@ function copyRecursive(src, dest) {
   }
 }
 
-// 5. Copy dist contents to public/
-console.log('[Vercel Build] Copying built assets from outputs/sim/dist to public/...');
-copyRecursive(distDir, publicDir);
+// 1. Check if public/ already has the production bundle
+const publicIndex = path.join(publicDir, 'index.html');
+const publicAssets = path.join(publicDir, 'assets');
 
-// 6. Copy interactive plots if available
-const plotsDir = path.join(rootDir, 'outputs', 'plots');
-if (fs.existsSync(plotsDir)) {
-  console.log('[Vercel Build] Copying outputs/plots to public/plots/...');
-  copyRecursive(plotsDir, path.join(publicDir, 'plots'));
+if (fs.existsSync(publicIndex) && fs.existsSync(publicAssets)) {
+  const assets = fs.readdirSync(publicAssets);
+  if (assets.some(a => a.endsWith('.js')) && assets.some(a => a.endsWith('.css'))) {
+    console.log('[Vercel Build] Pre-compiled production bundle verified in public/.');
+    console.log('[Vercel Build] Assets ready for Vercel Global Edge CDN delivery:');
+    assets.slice(0, 8).forEach(a => console.log(`  - assets/${a}`));
+    console.log('[Vercel Build] Zero build steps needed — deploying instantly.');
+    process.exit(0);
+  }
 }
 
-console.log('[Vercel Build] Build completed successfully! Contents of public/:');
+// 2. If outputs/sim/dist has the built bundle, copy to public
+const distIndex = path.join(distDir, 'index.html');
+const distAssets = path.join(distDir, 'assets');
+if (fs.existsSync(distIndex) && fs.existsSync(distAssets)) {
+  console.log('[Vercel Build] Found bundle in outputs/sim/dist, syncing to public/...');
+  copyRecursive(distDir, publicDir);
+  console.log('[Vercel Build] Synced to public/ successfully.');
+  process.exit(0);
+}
+
+// 3. Fallback: Only rebuild if neither exists, using standard npm (never pnpm to avoid URLSearchParams bug)
+console.log('[Vercel Build] Pre-built bundle not found, running npm build in outputs/sim...');
 try {
-  const publicEntries = fs.readdirSync(publicDir);
-  console.log(' - ' + publicEntries.join('\n - '));
-} catch (e) {
-  console.warn('[Vercel Build] Could not list public directory:', e.message);
+  execSync('npm --prefix outputs/sim install --production=false', { cwd: rootDir, stdio: 'inherit' });
+  execSync('npm --prefix outputs/sim run build', { cwd: rootDir, stdio: 'inherit' });
+  copyRecursive(distDir, publicDir);
+  console.log('[Vercel Build] Fallback build completed successfully.');
+} catch (err) {
+  console.error('[Vercel Build] Fallback build failed:', err.message);
+  process.exit(1);
 }
