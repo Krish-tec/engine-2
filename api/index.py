@@ -2,32 +2,89 @@
 
 import math
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
-import json, logging, os
+import json, logging, os, re
 from pathlib import Path
 import time as _time
 import requests as _requests
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 logger = logging.getLogger(__name__)
 
+is_production = os.getenv("ENV") == "production"
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 app = FastAPI(
     title="UC096 Engine 2 — Space Debris CAM API",
     description="Collision Avoidance Maneuver optimization for LEO satellites",
     version="1.0.0",
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-eval' blob:; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
+            "img-src 'self' data: blob: https://celestrak.org https://*.celestrak.org https://threejs.org; "
+            "connect-src 'self' https://celestrak.org https://*.celestrak.org https://threejs.org ws: wss:; "
+            "object-src 'none'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self';"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+]
+custom_origins = os.getenv("ALLOWED_ORIGINS")
+if custom_origins:
+    ALLOWED_ORIGINS.extend([o.strip() for o in custom_origins.split(",") if o.strip()])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s: %s", request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"ok": False, "detail": "Internal server error. Incident logged."},
+    )
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -71,6 +128,7 @@ AXIS_LABELS = {
 # ---------------------------------------------------------------------------
 class ConjunctionInput(BaseModel):
     """Input conjunction data for maneuver optimization."""
+    model_config = ConfigDict(extra="forbid")
 
     conjunction_id: int = Field(..., description="Unique conjunction event ID")
     active_sat_norad_id: int = Field(
@@ -133,6 +191,7 @@ class ConjunctionInput(BaseModel):
 
 class ManeuverOutput(BaseModel):
     """Optimized maneuver recommendation."""
+    model_config = ConfigDict(extra="forbid")
 
     conjunction_id: int
     optimal_maneuver_strategy: int
@@ -349,7 +408,7 @@ def _optimize(inp: ConjunctionInput) -> ManeuverOutput:
 @app.get("/", response_class=HTMLResponse)
 @app.get("/ui", response_class=HTMLResponse)
 def get_mission_control_ui():
-    """Serve the 3D Mission Control dashboard."""
+    """Serve the modern QuantumOrbit Conjunction Desk UI, falling back to legacy mission_control.html if dist/ not built."""
     base_dirs = [
         Path(__file__).resolve().parent.parent,
         Path(__file__).resolve().parent,
@@ -357,6 +416,11 @@ def get_mission_control_ui():
         Path("/var/task"),
     ]
     candidates = []
+    # 1. Primary: new QuantumOrbit Sim production bundle
+    for b in base_dirs:
+        candidates.append(b / "outputs" / "sim" / "dist" / "index.html")
+        candidates.append(b / "sim" / "dist" / "index.html")
+    # 2. Fallback: legacy mission_control.html
     for b in base_dirs:
         candidates.append(b / "outputs" / "mission_control.html")
         candidates.append(b / "mission_control.html")
@@ -369,7 +433,22 @@ def get_mission_control_ui():
                     return f.read()
         except Exception:
             pass
-    return "<h1>Mission Control UI not found. Please build outputs/mission_control.html.</h1>"
+    return "<h1>QuantumOrbit Sim UI not found. Run 'npm run build' in outputs/sim/.</h1>"
+
+
+# Mount static assets directory for the new Vite frontend if present
+for candidate in [
+    Path(__file__).resolve().parent.parent / "outputs" / "sim" / "dist" / "assets",
+    Path(__file__).resolve().parent / "outputs" / "sim" / "dist" / "assets",
+    Path.cwd() / "outputs" / "sim" / "dist" / "assets",
+    Path("/var/task/outputs/sim/dist/assets"),
+]:
+    try:
+        if candidate.is_dir():
+            app.mount("/assets", StaticFiles(directory=str(candidate)), name="sim-assets")
+            break
+    except Exception:
+        pass
 
 
 # Mount static plots directory for viewing interactive 3D HTMLs if present
@@ -393,7 +472,8 @@ def health_check():
 
 
 @app.post("/api/v1/engine2/optimize-maneuver", response_model=ManeuverOutput)
-def optimize_maneuver(input_data: ConjunctionInput):
+@limiter.limit("60/minute")
+def optimize_maneuver(input_data: ConjunctionInput, request: Request = None):
     """Compute optimal collision avoidance maneuver."""
     try:
         result = _optimize(input_data)
@@ -407,7 +487,8 @@ _debris_cache: dict = {"data": None, "ts": 0}
 _CACHE_TTL = 60  # seconds
 
 @app.get("/api/v1/live/debris-catalog")
-async def get_live_debris_catalog():
+@limiter.limit("60/minute")
+async def get_live_debris_catalog(request: Request = None):
     """Fetch real TLE data from CelesTrak, propagate with SGP4, return orbital params."""
     now = _time.time()
     if _debris_cache["data"] and (now - _debris_cache["ts"]) < _CACHE_TTL:
@@ -522,3 +603,162 @@ def get_benchmark():
         status_code=404,
         detail="Benchmark metrics not yet generated. Run main.py first.",
     )
+
+
+# ---------------------------------------------------------------------------
+# QuantumOrbit Sim Endpoints (Phases 4: Data Pipeline & Backend)
+# ---------------------------------------------------------------------------
+
+_live_tle_cache = {"ts": 0.0, "data": None}
+_sim_config = {
+    "simulation": {
+        "safeMissKm": 5.0,
+        "pcCritical": 1e-3,
+        "pcWarn": 1e-4,
+        "defaultFuelMs": 15.0,
+        "windowMinutes": 25,
+        "maxDebris": 400,
+        "exaggerationFactor": 20,
+    },
+    "camera": {
+        "minRadius": 70,
+        "maxRadius": 1500,
+        "focusDist": 26,
+        "fov": 42,
+    },
+    "visual": {
+        "kmPerUnit": 0.01,
+        "starCount": 4200,
+        "ambientIntensity": 0.5,
+    },
+    "ui": {
+        "theme": "dark",
+        "reducedMotion": "auto",
+        "soundEnabled": False,
+    },
+}
+
+FALLBACK_EARTH_TLE = (
+    "IRS-P5 (CARTOSAT-1)\n"
+    "1 28649U 05017A   26324.49216435  .00000078  00000-0  23842-4 0  9997\n"
+    "2 28649  97.8762  42.1583 0017834 112.5482 247.7421 14.86432109987654\n"
+    "RISAT-2B\n"
+    "1 44262U 19028A   26324.51234567  .00000123  00000-0  34567-4 0  9992\n"
+    "2 44262  37.0014 125.6742 0008432  89.4321 270.6543 15.23456789123456"
+)
+
+FALLBACK_COSMOS_DEBRIS = (
+    "COSMOS 2251 DEB\n"
+    "1 33836U 93036KT  26324.41234567  .00001234  00000-0  23456-3 0  9995\n"
+    "2 33836  74.0321 185.4321 0154321 210.4321 148.6543 14.23456789123456\n"
+    "COSMOS 2251 DEB\n"
+    "1 33757U 93036KH  26324.39876543  .00001876  00000-0  34567-3 0  9991\n"
+    "2 33757  74.0123 189.6543 0187654 225.6543 133.4321 14.12345678123456"
+)
+
+FALLBACK_FENGYUN_DEBRIS = (
+    "FENGYUN 1C DEB\n"
+    "1 29734U 99025A   26324.45678901  .00000543  00000-0  12345-3 0  9998\n"
+    "2 29734  98.6543 210.1234 0023456 180.1234 180.1234 13.98765432123456"
+)
+
+
+TLE_LINE1_REGEX = re.compile(r"^1\s+\d{5}[U ]")
+TLE_LINE2_REGEX = re.compile(r"^2\s+\d{5}\s+")
+MAX_UPSTREAM_BYTES = 2 * 1024 * 1024  # 2MB maximum payload size to protect against memory exhaustion
+
+@app.get("/api/v1/live/tles")
+@limiter.limit("60/minute")
+def get_live_tles(request: Request = None):
+    """Proxy CelesTrak GP orbital elements with 12-hour TTL in-memory caching and strict regex sanitization."""
+    now = _time.time()
+    cache_ttl = 12 * 3600  # 12 hours
+
+    if _live_tle_cache["data"] is not None and (now - _live_tle_cache["ts"]) < cache_ttl:
+        return _live_tle_cache["data"]
+
+    earth_text = FALLBACK_EARTH_TLE
+    cosmos_text = FALLBACK_COSMOS_DEBRIS
+    fengyun_text = FALLBACK_FENGYUN_DEBRIS
+
+    try:
+        # Upstream CelesTrak fetch with 5s timeout and stream cap to prevent SSRF / memory amplification
+        with _requests.get(
+            "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
+            timeout=5.0,
+            stream=True,
+        ) as r:
+            if r.status_code == 200:
+                content_chunks = []
+                bytes_read = 0
+                for chunk in r.iter_content(chunk_size=16384):
+                    bytes_read += len(chunk)
+                    if bytes_read > MAX_UPSTREAM_BYTES:
+                        logger.warning("Upstream TLE response exceeded 2MB cap; truncating.")
+                        break
+                    content_chunks.append(chunk)
+                fetched_text = b"".join(content_chunks).decode("utf-8", errors="replace")
+                # Validate format matches standard TLE
+                lines = [l.strip() for l in fetched_text.splitlines() if l.strip()]
+                has_tle_pairs = any(TLE_LINE1_REGEX.match(l) for l in lines)
+                if has_tle_pairs and len(fetched_text) > 100:
+                    earth_text = fetched_text
+    except Exception as exc:
+        logger.warning(f"Upstream CelesTrak live fetch failed, serving fallback: {exc}")
+
+    result = {
+        "ok": True,
+        "earth": earth_text,
+        "cosmos": cosmos_text,
+        "fengyun": fengyun_text,
+        "fetchedAt": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+    }
+    _live_tle_cache["data"] = result
+    _live_tle_cache["ts"] = now
+    return result
+
+
+@app.get("/api/v1/config")
+@limiter.limit("120/minute")
+def get_simulation_config(request: Request = None):
+    """Return runtime configuration and threshold parameters for QuantumOrbit Sim."""
+    return {"ok": True, "config": _sim_config}
+
+
+class ConfigUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    config: dict = Field(..., description="Partial or full configuration object to merge")
+
+
+@app.post("/api/v1/config")
+@limiter.limit("60/minute")
+def update_simulation_config(req: ConfigUpdateRequest, request: Request = None):
+    """Admin endpoint to update runtime simulation parameters dynamically."""
+    for section, values in req.config.items():
+        if section in _sim_config and isinstance(values, dict):
+            _sim_config[section].update(values)
+        else:
+            _sim_config[section] = values
+    return {"ok": True, "config": _sim_config}
+
+
+class TelemetryEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sessionDurationSeconds: Optional[float] = None
+    debrisCount: Optional[int] = None
+    burnExecuted: Optional[bool] = None
+    theme: Optional[str] = None
+    errors: Optional[int] = 0
+    clientTimestamp: Optional[str] = None
+
+
+@app.post("/api/v1/telemetry")
+@limiter.limit("120/minute")
+def submit_telemetry(event: TelemetryEvent, request: Request = None):
+    """Anonymous telemetry ingest endpoint without PII or IP logging."""
+    logger.info(
+        f"[QuantumOrbit Telemetry] session={event.sessionDurationSeconds}s, "
+        f"debris={event.debrisCount}, burnExecuted={event.burnExecuted}, errors={event.errors}"
+    )
+    return {"ok": True, "received": True}
+

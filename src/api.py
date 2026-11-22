@@ -9,6 +9,9 @@ from api.index import (
     optimize_maneuver,
     get_mission_control_ui,
     get_live_debris_catalog,
+    get_live_tles,
+    get_simulation_config,
+    submit_telemetry,
     get_benchmark,
     health_check,
 )
@@ -20,6 +23,9 @@ __all__ = [
     "optimize_maneuver",
     "get_mission_control_ui",
     "get_live_debris_catalog",
+    "get_live_tles",
+    "get_simulation_config",
+    "submit_telemetry",
     "get_benchmark",
     "health_check",
 ]

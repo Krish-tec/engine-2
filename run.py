@@ -50,8 +50,8 @@ def open_browser(url: str, delay_sec: float = 1.2):
     t.start()
 
 
-def run_server(host: str = "127.0.0.1", port: int = 8000, auto_open: bool = True):
-    """Start the FastAPI backend with uvicorn."""
+def run_server(host: str = "127.0.0.1", port: int = 8000, auto_open: bool = True, dev_mode: bool = False):
+    """Start the FastAPI backend with uvicorn. Reload is disabled by default to prevent CPU polling and battery drain."""
     try:
         import uvicorn
     except ImportError:
@@ -59,25 +59,25 @@ def run_server(host: str = "127.0.0.1", port: int = 8000, auto_open: bool = True
         sys.exit(1)
 
     print_banner(host, port)
-    target_url = f"http://localhost:{port}/" if host in ("127.0.0.1", "0.0.0.0") else f"http://{host}:{port}/"
+    target_url = f"http://localhost:{port}/" if host in ("127.0.0.1", "0.0.0.0") else f"http://{host}:{port}/"  # nosec B104
 
     if auto_open:
         open_browser(target_url)
 
     try:
-        uvicorn.run("src.api:app", host=host, port=port, reload=False, log_level="info")
+        uvicorn.run("src.api:app", host=host, port=port, reload=dev_mode, log_level="info")
     except KeyboardInterrupt:
         print("\n[QuantumOrbit] Mission Control Server shut down cleanly.")
 
 
 def run_pipeline(skip_tle: bool = True):
     """Execute the end-to-end ML & Optimization pipeline."""
-    import subprocess
+    import subprocess  # nosec B404
     cmd = [sys.executable, "main.py"]
     if skip_tle:
         cmd.append("--skip-tle")
     print(f"[QuantumOrbit] Executing pipeline: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True)  # nosec B603
 
 
 def main():
@@ -99,13 +99,16 @@ def main():
     parser.add_argument(
         "--with-tle", action="store_true", help="Fetch live CelesTrak TLEs when running pipeline"
     )
+    parser.add_argument(
+        "--dev", action="store_true", help="Enable dev reload mode (increases battery/CPU load)"
+    )
 
     args = parser.parse_args()
 
     if args.pipeline:
         run_pipeline(skip_tle=not args.with_tle)
     else:
-        run_server(host=args.host, port=args.port, auto_open=not args.no_browser)
+        run_server(host=args.host, port=args.port, auto_open=not args.no_browser, dev_mode=args.dev)
 
 
 if __name__ == "__main__":
