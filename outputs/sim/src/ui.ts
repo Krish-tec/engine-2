@@ -487,14 +487,9 @@ export class UI {
   }
 
   public setEarthLighting(mode: 'full-lit' | 'day-night'): void {
-    const icon = $('earthLightIcon');
     const text = $('earthLightText');
-    if (mode === 'full-lit') {
-      if (icon) icon.textContent = '☀️';
-      if (text) text.textContent = 'FULL LIT';
-    } else {
-      if (icon) icon.textContent = '🌗';
-      if (text) text.textContent = 'DAY / NIGHT';
+    if (text) {
+      text.textContent = mode === 'full-lit' ? 'FULL LIT' : 'DAY / NIGHT';
     }
   }
 }

@@ -634,10 +634,15 @@ export class OrbitRig {
     const goalPhi = Math.acos(THREE.MathUtils.clamp(goalDir.y, -1, 1));
     const goalTheta = Math.atan2(goalDir.z, goalDir.x);
 
-    // Setup 1.1s transit
+    // Shortest spherical angle path calculation to eliminate 360-degree camera spin
+    let dTheta = (goalTheta - this.theta) % (Math.PI * 2);
+    if (dTheta > Math.PI) dTheta -= Math.PI * 2;
+    if (dTheta < -Math.PI) dTheta += Math.PI * 2;
+
+    // Setup 1.25s smooth transit
     this._isTransitioning = true;
     this._transitElapsed = 0;
-    this._transitDuration = 1.1;
+    this._transitDuration = 1.25;
 
     this._transitStartTarget.copy(this.target);
     this._transitEndTarget.copy(point);
@@ -646,14 +651,14 @@ export class OrbitRig {
     this._transitEndRadius = targetDist;
 
     this._transitStartTheta = this.theta;
-    this._transitEndTheta = goalTheta;
+    this._transitEndTheta = this.theta + dTheta;
 
     this._transitStartPhi = this.phi;
     this._transitEndPhi = goalPhi;
 
     this.goalTarget.copy(point);
     this.goalRadius = targetDist;
-    this.goalTheta = goalTheta;
+    this.goalTheta = this.theta + dTheta;
     this.goalPhi = goalPhi;
 
     this.mode = `INSPECT ${name.toUpperCase()}`;
@@ -679,10 +684,10 @@ export class OrbitRig {
   }
 
   /**
-   * Cubic Bezier Easing: Smooth deceleration into close-up inspection
+   * Smooth cosine easing: Silky smooth acceleration and deceleration
    */
   private _easeCubic(t: number): number {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    return 0.5 - 0.5 * Math.cos(t * Math.PI);
   }
 
   /**

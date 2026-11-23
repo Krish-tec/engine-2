@@ -22,7 +22,6 @@ import {
   checkSweptCollision,
   computeAvoidanceUnitVector,
   isAvoidanceArrowVisible,
-  COLLISION_RADIUS_KM,
   sampleAvoidanceTrajectory,
   type AvoidanceTrajectoryBundle,
 } from './physics';
@@ -378,7 +377,12 @@ function triggerTestCrash(): void {
     } else return;
   }
 
+  // Force active selection to this satellite so camera and UI follow it
+  S.sel = { kind: 'sat', index: satIndex };
+  ui.setSelection(S.sel);
+
   // 2. Temporarily override Auto-Avoidance AI to OFF
+  const showcaseRate = 20;
   S.demoChoreography = {
     active: true,
     type: 'crash',
@@ -387,17 +391,16 @@ function triggerTestCrash(): void {
     originalAutoDodge: S.autoDodgeEnabled,
   };
 
-  const showcaseRate = 20;
-  if (S.rate < 10 || S.rate > 100) {
-    S.rate = showcaseRate;
-    ui.setRate(showcaseRate);
-  }
-
+  S.rate = showcaseRate;
+  ui.setRate(showcaseRate);
   S.autoDodgeEnabled = false;
   ui.setAutoDodgeState(false);
+  S.paused = false;
+  ui.setPaused(false);
 
-  // 3. Stage direct zero-miss intercept (TCA ~4.5s wall-clock at 20x)
-  const tcaMs = S.simMs + 4500 * showcaseRate;
+  // 3. Stage direct zero-miss intercept (impact in 1.8s wall-clock at 20x)
+  // At 20x, 1.8s wall-clock = 36,000 ms sim time
+  const tcaMs = S.simMs + 1800 * showcaseRate;
   let debIndex = -1;
   let minDist = Infinity;
   const satState = stateAt(sat, S.simMs);
@@ -422,7 +425,7 @@ function triggerTestCrash(): void {
   const deb = S.debris[debIndex];
 
   const leadHours = Math.max(1e-4, (tcaMs - S.simMs) / 3600000);
-  const directEv = deriveEncounter(sat, deb, S.simMs, leadHours, 0.00); // 0.00 km = direct impact
+  const directEv = deriveEncounter(sat, deb, S.simMs, leadHours, 0.00, satIndex);
   if (!directEv) return;
 
   S.ev = directEv;
@@ -432,7 +435,7 @@ function triggerTestCrash(): void {
     phase: 'ALERT',
     tBurnMs: 0, // No burn
     tcaMs: directEv.tca,
-    tClearMs: directEv.tca + 5000,
+    tClearMs: directEv.tca + 4000,
     plan: null,
     preMissKm: 0.00,
     postMissKm: 0.00,
@@ -450,18 +453,18 @@ function triggerTestCrash(): void {
   S.collisionTriggered = false;
   S.encounterState = 'approaching';
 
-  // 4. Frame camera on converging pair
+  // 4. Smoothly frame camera on converging pair at optimal inspection distance
   const satSt = stateAt(sat, S.simMs);
   const debSt = stateAt(deb, S.simMs);
   if (satSt && debSt) {
     const satPos = scenePos(satSt.r);
     const debPos = scenePos(debSt.r);
     const midPos = new THREE.Vector3().addVectors(satPos, debPos).multiplyScalar(0.5);
-    rig.focusOnObject(midPos, `${sat.name} vs ${deb.name}`, 'sat', satIndex, 5.0, midPos.clone().normalize());
+    rig.focusOnObject(midPos, `${sat.name} vs ${deb.name}`, 'sat', satIndex, 5.2, midPos.clone().normalize());
     S.follow = true;
   }
 
-  ui.setLivePill('☠️ CRASH DEMO ACTIVE · Impact in 4.5s', 'alert');
+  ui.setLivePill('☠️ CRASH DEMO ACTIVE · Impact in 1.8s', 'alert');
   ui.toast('SIMULATE CRASH · Direct kinetic collision demo initiated');
 }
 
@@ -558,7 +561,7 @@ function ensureScenarios(): void {
 
     // Ensure encounter crosses into the < 5 km keep-out corridor for high-impact educational demonstration
     if (ev.miss > 2.0 && !(deb as any)._derived) {
-      const d = deriveEncounter(S.sats[i], deb, S.t0, 0.42);
+      const d = deriveEncounter(S.sats[i], deb, S.t0, 0.42, 0.08, i);
       if (d) {
         d.derived = true;
         ev = d;
@@ -670,12 +673,19 @@ function selectObject(kind: 'sat' | 'deb', index: number, focus: boolean): void 
         S.primary = index;
         S.ev = sc.ev;
       }
+    } else {
+      // When a debris object is selected, link to its threatened satellite scenario!
+      const sc = S.scenarios.find(s => s.debIndex === index);
+      if (sc) {
+        S.primary = sc.satIndex;
+        S.ev = sc.ev;
+      }
     }
     if (focus) {
       const st = stateAt(body, S.simMs);
       if (st) {
         const p = scenePos(st.r);
-        let d = 36.0;
+        let d = 5.2;
         const sc = scenarioFor(S.primary);
         if (sc && S.sats[sc.satIndex] && S.debris[sc.debIndex]) {
           const sSt = stateAt(S.sats[sc.satIndex], S.simMs);
@@ -686,7 +696,8 @@ function selectObject(kind: 'sat' | 'deb', index: number, focus: boolean): void 
               (sSt.r[1] - dSt.r[1]) * KM,
               (sSt.r[2] - dSt.r[2]) * KM
             );
-            d = Math.max(36.0, pairDist * 1.6);
+            // Frame both objects cleanly in the viewport without extreme zoom
+            d = Math.min(18.0, Math.max(5.0, pairDist * 1.8));
           }
         }
         view.focusOn(st.r, d);
@@ -712,7 +723,7 @@ function focusSelected(): void {
   const st = body && stateAt(body, S.simMs);
   if (!st || !body) return;
   const p = scenePos(st.r);
-  let d = 36.0;
+  let d = 5.2;
   const sc = scenarioFor(S.primary);
   if (sc && S.sats[sc.satIndex] && S.debris[sc.debIndex]) {
     const sSt = stateAt(S.sats[sc.satIndex], S.simMs);
@@ -723,7 +734,7 @@ function focusSelected(): void {
         (sSt.r[1] - dSt.r[1]) * KM,
         (sSt.r[2] - dSt.r[2]) * KM
       );
-      d = Math.max(36.0, pairDist * 1.6);
+      d = Math.min(18.0, Math.max(5.0, pairDist * 1.8));
     }
   }
   view.focusOn(st.r, d);
@@ -1039,7 +1050,7 @@ function loop(now: number): void {
     const satSt = satStates[sc.satIndex];
     const debSt = stateAt(debObj, S.simMs);
 
-    if (satSt && debSt && (satObj.lifecycle === 'ACTIVE' || !satObj.lifecycle)) {
+    if (satSt && debSt && satObj.lifecycle !== 'DESTROYED' && satObj.lifecycle !== 'REMOVED') {
       const prevSat = lastSatPositions[sc.satIndex] || satSt.r;
       const prevDeb = lastDebPositions[sc.debIndex] || debSt.r;
 
@@ -1048,34 +1059,46 @@ function loop(now: number): void {
         satSt.r,
         prevDeb,
         debSt.r,
-        COLLISION_RADIUS_KM
+        1.5
+      );
+
+      const liveDist = Math.hypot(
+        satSt.r[0] - debSt.r[0],
+        satSt.r[1] - debSt.r[1],
+        satSt.r[2] - debSt.r[2]
       );
 
       const tcaSecDirect = (S.ev.t - S.simMs) / 1000;
-      const atTcaDirect = Math.abs(tcaSecDirect) <= 1.2 && (sc.ev?.miss || 1.0) <= COLLISION_RADIUS_KM;
+      const isCrashDemo = S.demoChoreography.active && S.demoChoreography.type === 'crash';
+      const atTcaCrash = isCrashDemo && (tcaSecDirect <= 0.4 || liveDist <= 2.5);
+      const atTcaDirect = Math.abs(tcaSecDirect) <= 1.0 && (sc.ev?.miss || 1.0) <= 1.5;
 
       const burn = S.burns[sc.satIndex];
       const isDodgeActive = S.autoDodgeEnabled || (burn && burn.fired);
 
-      if ((colliding || atTcaDirect) && !isDodgeActive && !S.collisionTriggered) {
+      if ((colliding || atTcaDirect || atTcaCrash || liveDist <= 1.5) && !isDodgeActive && !S.collisionTriggered) {
         S.collisionTriggered = true;
-        satObj.lifecycle = 'COLLIDING';
-        debObj.lifecycle = 'COLLIDING';
+        satObj.lifecycle = 'DESTROYED';
+        debObj.lifecycle = 'DESTROYED';
         satObj.impactPos = impactPosKm as [Km, Km, Km];
         debObj.impactPos = impactPosKm as [Km, Km, Km];
 
         ui.toast('💥 KINETIC IMPACT · SATELLITE DESTROYED');
+        ui.setLivePill('💥 Impact Confirmed — Satellite & Debris Destroyed', 'alert');
+
+        view.purgeSatellite(sc.satIndex);
+        view.purgeDebris(sc.debIndex);
+        ui.setCatalog(S.sats.slice(0, S.satN), S.debris.slice(0, S.debN), S.risks);
+        ui.setCounts(S.satN, S.debN);
 
         view.triggerCollisionEffect(impactPosKm, sc.satIndex, sc.debIndex, () => {
-          satObj.lifecycle = 'DESTROYED';
-          debObj.lifecycle = 'DESTROYED';
-          view.purgeSatellite(sc.satIndex);
-          view.purgeDebris(sc.debIndex);
-          ui.setCatalog(S.sats.slice(0, S.satN), S.debris.slice(0, S.debN), S.risks);
-          ui.setCounts(S.satN, S.debN);
+          if (isCrashDemo) {
+            S.demoChoreography.active = false;
+            S.demoChoreography.type = null;
+          }
           setTimeout(() => {
             rig.resetToPlanetView();
-          }, 1600);
+          }, 1800);
         });
       }
     }

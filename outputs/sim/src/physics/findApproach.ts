@@ -59,7 +59,7 @@ export function findApproach(
   }
 
   // Stage 2: Golden-section polish
-  let lo = best.t - step * 1000;
+  let lo = Math.max(t0, best.t - step * 1000);
   let hi = best.t + step * 1000;
   const gr = 0.6180339887;
   let x1 = hi - gr * (hi - lo);

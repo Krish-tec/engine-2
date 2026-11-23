@@ -4,12 +4,12 @@
   --panel-w: 300px;
   --bar-h: 50px;
 
-  /* Color Psychology: Monochrome + Punchy Neon Leafy Green Design System */
-  --bg: #07080a;
-  --surface: #0e1013;
-  --surface-2: #15181c;
-  --border: #23272d;
-  --border-strong: #323740;
+  /* Color Psychology: Pure Pitch Black + Punchy Neon Leafy Green Design System */
+  --bg: #000000;
+  --surface: #000000;
+  --surface-2: #050505;
+  --border: #161616;
+  --border-strong: #222222;
 
   /* Typography Colors */
   --ink: #f5f7f6;
@@ -19,7 +19,7 @@
   /* Neon Leafy Green Accent (Safety, Precision, Intelligence) */
   --accent: #34e858;
   --accent-soft: rgba(52, 232, 88, 0.14);
-  --accent-ink: #051a09;
+  --accent-ink: #000000;
   --accent-vivid: #22c55e;
 
   /* Restrained Danger Accent (Collision & Threat Only) */
@@ -28,11 +28,11 @@
   --crit: #ef4444;
   --crit-bg: rgba(239, 68, 68, 0.14);
 
-  /* Legacy Compat Tokens mapped to strict palette */
-  --bg-panel: rgba(14, 16, 19, 0.96);
-  --panel-2: #15181c;
-  --line: #23272d;
-  --line-2: #323740;
+  /* Legacy Compat Tokens mapped to pure pitch black palette */
+  --bg-panel: rgba(0, 0, 0, 0.98);
+  --panel-2: #050505;
+  --line: #161616;
+  --line-2: #222222;
   --text: #f5f7f6;
   --dim: #9aa2ac;
   --dim-2: #666e78;
@@ -79,6 +79,12 @@ html[data-theme="light"] {
   --safe-bg: rgba(21, 128, 61, 0.12);
 }
 
+html[data-theme="light"] .bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
 html[data-theme="light"] .obj .pill.danger,
 html[data-theme="light"] .status-badge.danger {
   color: #7f1d1d;
@@ -106,7 +112,7 @@ html, body {
   height: 100vh;
   margin: 0;
   padding: 0;
-  background: var(--ink);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
   font-size: 13px;
@@ -159,8 +165,9 @@ button {
   align-items: center;
   gap: 20px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--line);
-  background: var(--ink-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   z-index: 20;
 }
 

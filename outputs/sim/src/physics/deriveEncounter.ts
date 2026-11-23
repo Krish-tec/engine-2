@@ -21,17 +21,33 @@ export function deriveEncounter(
   debB: SpaceBody,
   t0: number,
   targetHours = 0.22,
-  missKm = 0.08
+  missKm = 0.08,
+  geometryIndex = 0
 ): (ConjunctionApproach & { derived: boolean }) | null {
   const tcaMs = Math.round(t0 + targetHours * 3600000);
   const s = stateAt(satB, tcaMs);
   if (!s) return null;
 
   const b = rtn(s.r, s.v);
-  const dir = unit(add(scale(b.T, 0.34), add(scale(b.N, 0.92), scale(b.R, 0.18))));
+  
+  // Diverse encounter geometries across scenarios:
+  // 0: Cross-track oblique (default)
+  // 1: Radial descent / ascending cut
+  // 2: Fast along-track catchup
+  // 3: High-inclination polar cut
+  // 4: Retrograde head-on crossing
+  const geoms = [
+    add(scale(b.T, 0.34), add(scale(b.N, 0.92), scale(b.R, 0.18))),
+    add(scale(b.T, -0.65), add(scale(b.N, 0.45), scale(b.R, -0.62))),
+    add(scale(b.T, 0.95), add(scale(b.N, 0.28), scale(b.R, 0.12))),
+    add(scale(b.T, 0.15), add(scale(b.N, -0.96), scale(b.R, 0.22))),
+    add(scale(b.T, -0.88), add(scale(b.N, -0.42), scale(b.R, 0.18))),
+  ];
+  const chosenGeom = geoms[Math.abs(geometryIndex) % geoms.length];
+  const dir = unit(chosenGeom);
   const relV = scale(dir, 1.6);
   const perp = unit(sub(b.T, scale(dir, dot(b.T, dir))));
-  const rel = scale(perp, missKm);
+  const rel = missKm > 0.001 ? scale(perp, missKm) : [0, 0, 0];
 
   const dr = add(s.r, rel);
   const dv = add(s.v, relV);

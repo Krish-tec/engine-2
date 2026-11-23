@@ -1380,7 +1380,9 @@ export class SceneView {
 
       for (let i = 0; i < cap; i++) {
         const pKm = debris[i];
-        if (i < maxDeb && pKm) {
+        const debBody = this.debris[i]?.body;
+        const isDestroyedOrRemoved = debBody && (debBody.lifecycle === 'DESTROYED' || debBody.lifecycle === 'REMOVED' || debBody.lifecycle === 'COLLIDING');
+        if (i < maxDeb && pKm && !isDestroyedOrRemoved) {
           // Advance calm, realistic zero-G tumble
           this._debRotX[i] += this._debSpinX[i] * dtReal;
           this._debRotY[i] += this._debSpinY[i] * dtReal;
@@ -1405,7 +1407,9 @@ export class SceneView {
       const maxDeb = Math.min(this.activeDebris, debris.length);
       for (let i = 0; i < this.debris.length; i++) {
         const pKm = debris[i];
-        if (i < maxDeb && pKm) {
+        const debBody = this.debris[i]?.body;
+        const isDestroyedOrRemoved = debBody && (debBody.lifecycle === 'DESTROYED' || debBody.lifecycle === 'REMOVED' || debBody.lifecycle === 'COLLIDING');
+        if (i < maxDeb && pKm && !isDestroyedOrRemoved) {
           this._dummyPos.set(pKm[0] * KM, pKm[2] * KM, -pKm[1] * KM);
           let tanDeb: THREE.Vector3 | null = null;
           if (debrisTangents && debrisTangents[i]) {
