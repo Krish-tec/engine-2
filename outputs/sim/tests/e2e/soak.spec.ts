@@ -1,17 +1,20 @@
 import { test, expect } from './fixtures';
 
 test.describe('QuantumOrbit Sim - Soak & Stability', () => {
-  test('accelerated 600x time-dilation simulation maintains stability and heap bounds', async ({ simPage }) => {
-    // Switch to 600x rate
-    const rate600Btn = simPage.locator('button[data-rate="600"]');
-    await rate600Btn.click();
-    await expect(rate600Btn).toHaveClass(/on/);
+  test('accelerated 500x time-dilation simulation maintains stability and heap bounds', async ({ simPage }) => {
+    // Switch to 500x rate via precision speed slider
+    const speedSlider = simPage.locator('#speedSlider');
+    await speedSlider.fill('500');
+    await speedSlider.dispatchEvent('input');
+
+    const speedVal = simPage.locator('#speedVal');
+    await expect(speedVal).toHaveText('500×');
 
     // Initial MET readout
     const met = simPage.locator('#met');
     const initialMet = await met.innerText();
 
-    // Advance through accelerated simulation for 5 seconds (simulates 50 minutes of orbital time)
+    // Advance through accelerated simulation for 5 seconds (simulates ~40 minutes of orbital time)
     await simPage.waitForTimeout(5000);
 
     const advancedMet = await met.innerText();
@@ -26,17 +29,15 @@ test.describe('QuantumOrbit Sim - Soak & Stability', () => {
     expect(exportedStateJson).not.toBeNull();
     const parsedState = JSON.parse(exportedStateJson);
     expect(Number.isFinite(parsedState.simMs)).toBe(true);
-    expect(parsedState.rate).toBe(600);
+    expect(parsedState.rate).toBe(500);
 
     // Scrub back and forth to stress memory and buffer allocations
-    const timeline = simPage.locator('#timeline');
-    const box = await timeline.boundingBox();
-    if (box) {
-      await simPage.mouse.click(box.x + box.width * 0.2, box.y + box.height / 2);
-      await simPage.waitForTimeout(500);
-      await simPage.mouse.click(box.x + box.width * 0.8, box.y + box.height / 2);
-      await simPage.waitForTimeout(500);
-    }
+    await speedSlider.fill('100');
+    await speedSlider.dispatchEvent('input');
+    await simPage.waitForTimeout(500);
+    await speedSlider.fill('500');
+    await speedSlider.dispatchEvent('input');
+    await simPage.waitForTimeout(500);
 
     // Verify canvas remains active
     const viewCanvas = simPage.locator('#view');

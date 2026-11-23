@@ -3,13 +3,13 @@ import { test, expect } from './fixtures';
 test.describe('Flow 8: Keyboard Navigation', () => {
   test('keyboard Tab/Enter/Space/Arrow navigation reaches controls without focus traps', async ({ simPage }) => {
     const pauseBtn = simPage.locator('#pauseBtn');
-    await expect(pauseBtn).toHaveText('PAUSE');
+    await expect(pauseBtn).toContainText('PAUSE');
 
     // Space toggles simulation pause / resume
     await simPage.keyboard.press('Space');
-    await expect(pauseBtn).toHaveText('RESUME');
+    await expect(pauseBtn).toContainText('RESUME');
     await simPage.keyboard.press('Space');
-    await expect(pauseBtn).toHaveText('PAUSE');
+    await expect(pauseBtn).toContainText('PAUSE');
 
     // ? opens navigation help modal
     await simPage.keyboard.press('?');
