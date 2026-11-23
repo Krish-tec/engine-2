@@ -86,6 +86,21 @@ export class UI {
     });
     $('themeBtn')?.addEventListener('click', () => this.h.theme?.());
 
+    // Custom 1x to 500x Precision Speed Slider
+    const speedSlider = $('speedSlider') as HTMLInputElement | null;
+    const speedVal = $('speedVal');
+    if (speedSlider) {
+      speedSlider.addEventListener('input', () => {
+        let val = Number(speedSlider.value);
+        // Map 0 to strictly 1x real-time; otherwise multiple of 20
+        let rate = val <= 0 ? 1 : val;
+        if (speedVal) speedVal.textContent = `${rate}×`;
+        const pct = (val / 500) * 100;
+        speedSlider.style.setProperty('--slider-pct', `${pct}%`);
+        this.h.rate?.(rate);
+      });
+    }
+
     $('timeline')?.addEventListener('click', (e: MouseEvent) => {
       const el = e.currentTarget as HTMLElement;
       const r = el.getBoundingClientRect();
@@ -95,16 +110,23 @@ export class UI {
       this.h.scrub?.(frac);
     });
 
+    const autoFollowBtn = $('autoFollowBtn');
     const autoFollowEl = $('autoFollowToggle') as HTMLInputElement | null;
-    autoFollowEl?.addEventListener('change', () => {
-      this.h.toggleAutoFollow?.(autoFollowEl.checked);
+    autoFollowBtn?.addEventListener('click', () => {
+      const next = autoFollowBtn.getAttribute('aria-checked') !== 'true';
+      autoFollowBtn.setAttribute('aria-checked', String(next));
+      autoFollowBtn.classList.toggle('on', next);
+      if (autoFollowEl) autoFollowEl.checked = next;
+      this.h.toggleAutoFollow?.(next);
     });
 
+    const autoDodgeBtn = $('autoDodgeBtn');
     const autoDodgeEl = $('autoDodgeToggle') as HTMLInputElement | null;
-    autoDodgeEl?.addEventListener('change', () => {
-      const enabled = autoDodgeEl.checked;
-      this.setAutoDodgeState(enabled);
-      this.h.toggleAutoDodge?.(enabled);
+    autoDodgeBtn?.addEventListener('click', () => {
+      const next = autoDodgeBtn.getAttribute('aria-checked') !== 'true';
+      if (autoDodgeEl) autoDodgeEl.checked = next;
+      this.setAutoDodgeState(next);
+      this.h.toggleAutoDodge?.(next);
     });
 
     $('testCrashBtn')?.addEventListener('click', () => {
@@ -140,18 +162,18 @@ export class UI {
   }
 
   public setAutoDodgeState(enabled: boolean): void {
+    const autoDodgeBtn = $('autoDodgeBtn');
     const autoDodgeEl = $('autoDodgeToggle') as HTMLInputElement | null;
-    const autoDodgeLabel = $('autoDodgeLabel');
     const planState = $('planState');
     const planExplanation = $('planExplanation');
-    if (autoDodgeEl) autoDodgeEl.checked = enabled;
-    if (autoDodgeLabel) {
-      autoDodgeLabel.textContent = enabled ? 'ON' : 'OFF';
-      autoDodgeLabel.classList.toggle('off', !enabled);
+    if (autoDodgeBtn) {
+      autoDodgeBtn.setAttribute('aria-checked', String(enabled));
+      autoDodgeBtn.classList.toggle('on', enabled);
     }
+    if (autoDodgeEl) autoDodgeEl.checked = enabled;
     if (planState) {
       planState.textContent = enabled ? 'STANDBY' : 'OFFLINE';
-      planState.style.borderColor = enabled ? 'var(--line-2)' : '#ef4444';
+      planState.style.borderColor = enabled ? 'rgba(52, 232, 88, 0.35)' : 'var(--danger)';
     }
     if (planExplanation) {
       planExplanation.textContent = enabled
@@ -360,7 +382,7 @@ export class UI {
 
   public setPlan(plan: any, _fuelLeft?: number, _state?: string): void {
     const btn = $('executeBtn') as HTMLButtonElement;
-    if (btn) btn.disabled = !plan;
+    if (btn) btn.disabled = false;
 
     const planStateEl = $('planState');
     const fuelEl = $('kpiFuel') || $('dodgeBurn');
@@ -377,15 +399,21 @@ export class UI {
   }
 
   public setRate(r: number): void {
-    document.querySelectorAll('#rates button').forEach(b => {
-      const el = b as HTMLElement;
-      b.classList.toggle('on', +el.dataset.rate! === r);
-    });
+    const slider = $('speedSlider') as HTMLInputElement | null;
+    const speedVal = $('speedVal');
+    if (slider) {
+      slider.value = String(r);
+      const pct = (r / 500) * 100;
+      slider.style.setProperty('--slider-pct', `${pct}%`);
+    }
+    if (speedVal) {
+      speedVal.textContent = `${r}×`;
+    }
   }
 
   public setPaused(p: boolean): void {
     const btn = $('pauseBtn');
-    if (btn) btn.textContent = p ? 'RESUME' : 'PAUSE';
+    if (btn) btn.textContent = p ? '▶ RESUME' : '⏸ PAUSE';
   }
 
   public setSource(ageDays: number, live: boolean): void {

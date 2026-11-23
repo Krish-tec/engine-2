@@ -24,6 +24,10 @@ export const COL = {
   warn: 0xffc24b,
   crit: 0xff4136,
   dim: 0x8c9098,
+  neonGreen: 0x34E858,
+  neonGreenEmissive: 0x22C55E,
+  coldGasWhite: 0xFFFFFF,
+  coldGasMist: 0xD1FAE5,
 };
 
 export const DEBRIS_PALETTE = [
@@ -217,6 +221,333 @@ function labelSprite(text: string, color = '#ece9e3'): THREE.Sprite {
   return s;
 }
 
+/**
+ * ThrusterPlume - Zero-GC Cold-Gas RCS Exhaust Plume System
+ * 
+ * Pre-allocates a pool of 72 soft white/ice-mist particles using THREE.Points
+ * with additive blending for a crisp, unmistakable thruster jet effect.
+ * Particles are recycled during BURNING phase with tight cone spread (±14°)
+ * opposite to the thrust direction (Newton's 3rd Law).
+ */
+export class ThrusterPlume {
+  private points: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  private positions: Float32Array;
+  private velocities: Float32Array;
+  private lifetimes: Float32Array;
+  private maxLifetimes: Float32Array;
+  private scales: Float32Array;
+  private alphas: Float32Array;
+  private activeCount: number = 0;
+  private particleCount: number = 72;
+  private texture: THREE.CanvasTexture;
+  private exhaustDir: THREE.Vector3 = new THREE.Vector3(0, 0, -1);
+  private nozzlePos: THREE.Vector3 = new THREE.Vector3();
+  private emitting: boolean = false;
+  private emitTimer: number = 0;
+  private readonly emitDuration: number = 2.5; // seconds of wall-clock emission during initial deflection
+  private readonly particleLifetime: number = 0.65; // seconds
+  private readonly coneAngle: number = Math.PI / 13; // ~14 degrees
+  private readonly baseScale: number = 0.5;
+  private readonly maxScale: number = 2.0;
+  private readonly nozzleCore: THREE.Sprite;
+  private nozzleCoreMaterial: THREE.SpriteMaterial;
+  private scene: THREE.Scene;
+
+  constructor(scene: THREE.Scene) {
+    this.scene = scene;
+    
+    // Create soft radial particle texture (white core fading to translucent mist)
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, '#FFFFFF');      // Pure white core
+    grad.addColorStop(0.3, '#E8F5E9');    // Very pale green tint
+    grad.addColorStop(0.6, '#C8E6C9');    // Soft mint
+    grad.addColorStop(1, 'rgba(209,250,229,0)'); // Transparent edge
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+    this.texture = new THREE.CanvasTexture(canvas);
+    this.texture.colorSpace = THREE.SRGBColorSpace;
+
+    // Pre-allocate particle data arrays
+    this.positions = new Float32Array(this.particleCount * 3);
+    this.velocities = new Float32Array(this.particleCount * 3);
+    this.lifetimes = new Float32Array(this.particleCount);
+    this.maxLifetimes = new Float32Array(this.particleCount);
+    this.scales = new Float32Array(this.particleCount);
+    this.alphas = new Float32Array(this.particleCount);
+
+    // Initialize all particles as inactive
+    for (let i = 0; i < this.particleCount; i++) {
+      this.lifetimes[i] = -1;
+      this.maxLifetimes[i] = this.particleLifetime;
+      this.positions[i * 3] = 0;
+      this.positions[i * 3 + 1] = 0;
+      this.positions[i * 3 + 2] = 0;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    geometry.setAttribute('aScale', new THREE.BufferAttribute(this.scales, 1));
+    geometry.setAttribute('aAlpha', new THREE.BufferAttribute(this.alphas, 1));
+
+    const material = new THREE.PointsMaterial({
+      map: this.texture,
+      size: 1,
+      vertexColors: false,
+      transparent: true,
+      opacity: 1,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+      color: 0xFFFFFF,
+    });
+
+    // Custom shader for per-particle scale and alpha
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = { value: 0 };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `
+          #include <common>
+          attribute float aScale;
+          attribute float aAlpha;
+          varying float vAlpha;
+          varying float vScale;
+        `)
+        .replace('gl_PointSize = size;', `
+          vAlpha = aAlpha;
+          vScale = aScale;
+          gl_PointSize = size * aScale * (900.0 / -mvPosition.z);
+        `);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `
+          #include <common>
+          varying float vAlpha;
+          varying float vScale;
+        `)
+        .replace('gl_FragColor = vec4( outgoingLight, diffuseColor.a );', `
+          gl_FragColor = vec4( outgoingLight, vAlpha );
+        `);
+    };
+
+    this.points = new THREE.Points(geometry, material);
+    this.points.frustumCulled = false;
+    this.scene.add(this.points);
+
+    // Nozzle core flare sprite
+    const coreCanvas = document.createElement('canvas');
+    coreCanvas.width = coreCanvas.height = 32;
+    const coreCtx = coreCanvas.getContext('2d')!;
+    const coreGrad = coreCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    coreGrad.addColorStop(0, '#FFFFFF');
+    coreGrad.addColorStop(0.3, '#A7F3D0');
+    coreGrad.addColorStop(1, 'rgba(52,232,88,0)');
+    coreCtx.fillStyle = coreGrad;
+    coreCtx.beginPath();
+    coreCtx.arc(16, 16, 16, 0, Math.PI * 2);
+    coreCtx.fill();
+    const coreTexture = new THREE.CanvasTexture(coreCanvas);
+    coreTexture.colorSpace = THREE.SRGBColorSpace;
+
+    this.nozzleCoreMaterial = new THREE.SpriteMaterial({
+      map: coreTexture,
+      color: 0x34E858,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0,
+    });
+    this.nozzleCore = new THREE.Sprite(this.nozzleCoreMaterial);
+    this.nozzleCore.scale.set(0.4, 0.4, 1);
+    this.nozzleCore.visible = false;
+    this.scene.add(this.nozzleCore);
+  }
+
+  /**
+   * Set the exhaust direction (opposite to thrust direction per Newton's 3rd Law)
+   * and nozzle position for emission.
+   */
+  setExhaustDirection(thrustDir: THREE.Vector3, nozzleWorldPos: THREE.Vector3): void {
+    this.exhaustDir.copy(thrustDir).negate().normalize();
+    this.nozzlePos.copy(nozzleWorldPos);
+    this.nozzleCore.position.copy(nozzleWorldPos);
+  }
+
+  /**
+   * Start emitting particles (called when entering BURNING phase)
+   */
+  startEmission(): void {
+    this.emitting = true;
+    this.emitTimer = 0;
+    this.nozzleCore.visible = true;
+    this.nozzleCoreMaterial.opacity = 1;
+  }
+
+  /**
+   * Stop emitting particles (called when exiting BURNING phase)
+   */
+  stopEmission(): void {
+    this.emitting = false;
+    // Fade out nozzle core
+    this.nozzleCoreMaterial.opacity = 0;
+    this.nozzleCore.visible = false;
+  }
+
+  /**
+   * Update the plume - call once per frame
+   * @param dtReal Real delta time in seconds
+   * @param camDist Camera distance for scaling
+   */
+  update(dtReal: number, camDist: number): void {
+    // Scale plume dimensions with camera distance
+    const scaleFactor = THREE.MathUtils.clamp(camDist * 0.045, 0.25, 1.8);
+    const baseScale = this.baseScale * scaleFactor;
+    const maxScale = this.maxScale * scaleFactor;
+
+    // Update nozzle core pulse
+    if (this.emitting) {
+      const pulse = 0.85 + 0.15 * Math.sin(performance.now() * 0.008);
+      this.nozzleCore.scale.set(0.4 * pulse * scaleFactor, 0.4 * pulse * scaleFactor, 1);
+    }
+
+    // Emit new particles during emission phase
+    if (this.emitting) {
+      this.emitTimer += dtReal;
+      if (this.emitTimer <= this.emitDuration) {
+        // Emit ~12 particles per frame during active burn
+        const emitRate = 12;
+        for (let i = 0; i < emitRate && this.activeCount < this.particleCount; i++) {
+          this.spawnParticle(baseScale, maxScale);
+        }
+      } else {
+        this.emitting = false;
+        this.nozzleCoreMaterial.opacity = 0;
+        this.nozzleCore.visible = false;
+      }
+    }
+
+    // Update all active particles
+    const positions = this.positions;
+    const velocities = this.velocities;
+    const lifetimes = this.lifetimes;
+    const scales = this.scales;
+    const alphas = this.alphas;
+
+    for (let i = 0; i < this.particleCount; i++) {
+      if (lifetimes[i] <= 0) continue;
+
+      lifetimes[i] -= dtReal;
+      if (lifetimes[i] <= 0) {
+        lifetimes[i] = -1;
+        this.activeCount--;
+        continue;
+      }
+
+      // Update position
+      const idx = i * 3;
+      positions[idx] += velocities[idx] * dtReal;
+      positions[idx + 1] += velocities[idx + 1] * dtReal;
+      positions[idx + 2] += velocities[idx + 2] * dtReal;
+
+      // Scale up over lifetime (0.08 -> 0.48)
+      const lifeRatio = 1.0 - lifetimes[i] / this.maxLifetimes[i];
+      scales[i] = baseScale + (maxScale - baseScale) * lifeRatio;
+
+      // Fade out smoothly
+      alphas[i] = 0.85 * (1.0 - lifeRatio * lifeRatio); // Quadratic fade for smooth dissipation
+    }
+
+    // Update buffer attributes
+    this.points.geometry.attributes.position.needsUpdate = true;
+    this.points.geometry.attributes.aScale.needsUpdate = true;
+    this.points.geometry.attributes.aAlpha.needsUpdate = true;
+  }
+
+  /**
+   * Spawn a new particle from the nozzle
+   */
+  private spawnParticle(baseScale: number, _maxScale: number): void {
+    // Find inactive particle slot
+    let slot = -1;
+    for (let i = 0; i < this.particleCount; i++) {
+      if (this.lifetimes[i] <= 0) {
+        slot = i;
+        break;
+      }
+    }
+    if (slot === -1) return;
+
+    const idx = slot * 3;
+
+    // Position at nozzle with small offset along exhaust direction
+    this.positions[idx] = this.nozzlePos.x + this.exhaustDir.x * 0.16;
+    this.positions[idx + 1] = this.nozzlePos.y + this.exhaustDir.y * 0.16;
+    this.positions[idx + 2] = this.nozzlePos.z + this.exhaustDir.z * 0.16;
+
+    // Velocity: tight cone around exhaust direction (±14°)
+    const coneAngle = this.coneAngle;
+    const theta = Math.random() * coneAngle;
+    const phi = Math.random() * Math.PI * 2;
+    const speed = 1.2 + Math.random() * 0.8; // 1.2-2.0 units/sec
+
+    const dirX = Math.sin(theta) * Math.cos(phi);
+    const dirY = Math.sin(theta) * Math.sin(phi);
+    const dirZ = Math.cos(theta);
+
+    // Rotate to align with exhaustDir
+    const exhaustNormalized = this.exhaustDir.clone().normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    if (Math.abs(exhaustNormalized.dot(up)) > 0.99) {
+      up.set(1, 0, 0);
+    }
+    const right = new THREE.Vector3().crossVectors(up, exhaustNormalized).normalize();
+    const forward = new THREE.Vector3().crossVectors(exhaustNormalized, right).normalize();
+
+    const worldDir = new THREE.Vector3(
+      dirX * right.x + dirY * up.x + dirZ * forward.x,
+      dirX * right.y + dirY * up.y + dirZ * forward.y,
+      dirX * right.z + dirY * up.z + dirZ * forward.z
+    ).normalize();
+
+    this.velocities[idx] = worldDir.x * speed;
+    this.velocities[idx + 1] = worldDir.y * speed;
+    this.velocities[idx + 2] = worldDir.z * speed;
+
+    this.lifetimes[slot] = this.particleLifetime;
+    this.maxLifetimes[slot] = this.particleLifetime;
+    this.scales[slot] = baseScale;
+    this.alphas[slot] = 0.85;
+    this.activeCount++;
+  }
+
+  /**
+   * Set visibility of the entire plume system
+   */
+  setVisible(visible: boolean): void {
+    this.points.visible = visible;
+    this.nozzleCore.visible = visible && this.emitting;
+  }
+
+  /**
+   * Dispose of resources
+   */
+  dispose(): void {
+    this.scene.remove(this.points);
+    this.points.geometry.dispose();
+    (this.points.material as THREE.PointsMaterial).map?.dispose();
+    (this.points.material as THREE.PointsMaterial).dispose();
+    
+    this.scene.remove(this.nozzleCore);
+    this.nozzleCoreMaterial.map?.dispose();
+    this.nozzleCoreMaterial.dispose();
+    this.texture.dispose();
+  }
+}
+
 export interface SceneSatellite {
   group: THREE.Group;
   body: SpaceBody;
@@ -225,6 +556,7 @@ export interface SceneSatellite {
   orbit?: THREE.Line;
   blueVelArrow?: THREE.Mesh;
   greenAvoidArrow?: THREE.Mesh;
+  thrusterPlume?: ThrusterPlume;
   lifecycle?: LifecycleState;
 }
 
@@ -795,16 +1127,19 @@ export class SceneView {
       const greenAvoidArrow = new THREE.Mesh(
         avoidGeo,
         new THREE.MeshStandardMaterial({
-          color: 0x10b981,
-          emissive: 0x047857,
-          emissiveIntensity: 0.75,
-          roughness: 0.3,
-          metalness: 0.5,
+          color: COL.neonGreen,
+          emissive: COL.neonGreenEmissive,
+          emissiveIntensity: 0.85,
+          roughness: 0.25,
+          metalness: 0.4,
         })
       );
       greenAvoidArrow.visible = false;
       greenAvoidArrow.frustumCulled = false;
       this.arrowLayer.add(greenAvoidArrow);
+
+      // Initialize ThrusterPlume for this satellite
+      const thrusterPlume = new ThrusterPlume(this.scene);
 
       this.sats.push({
         group: g,
@@ -814,6 +1149,7 @@ export class SceneView {
         orbit: line,
         blueVelArrow,
         greenAvoidArrow,
+        thrusterPlume,
         lifecycle: b.lifecycle || 'ACTIVE',
       });
     });
@@ -1268,7 +1604,7 @@ export class SceneView {
       return mag < 2000 ? new THREE.Vector3(p[0], p[1], p[2]) : toScene(p);
     };
 
-    // 1. Original default trajectory through encounter (Dashed Blue Line #3B82F6)
+    // 1. Abandoned Default Trajectory (Dashed Crimson/Red Line #EF4444 - "Crash if Untouched")
     if (this.crashLine) {
       this.dynamic.remove(this.crashLine);
       this.crashLine.geometry.dispose();
@@ -1282,11 +1618,11 @@ export class SceneView {
         this.crashLine = new THREE.Line(
           g,
           new THREE.LineDashedMaterial({
-            color: 0x3b82f6,
+            color: 0xEF4444, // Crimson red for crash path
             dashSize: 0.8,
             gapSize: 0.5,
             transparent: true,
-            opacity: 0.55,
+            opacity: 0.65,
             depthWrite: false,
           })
         );
@@ -1295,7 +1631,7 @@ export class SceneView {
       }
     }
 
-    // 2. Engine 2 Avoidance Path (Solid Glowing Emerald-Green Line #10B981)
+    // 2. Engine 2 Avoidance Path (Solid Glowing Neon Leafy Green Line #34E858 - "Safe AI Bypass")
     if (this.avoidLine) {
       this.dynamic.remove(this.avoidLine);
       this.avoidLine.geometry.dispose();
@@ -1309,7 +1645,7 @@ export class SceneView {
         this.avoidLine = new THREE.Line(
           g,
           new THREE.LineBasicMaterial({
-            color: 0x10b981,
+            color: COL.neonGreen, // Neon leafy green
             transparent: true,
             opacity: this._avoidPathOpacity,
             depthWrite: false,
@@ -1320,7 +1656,7 @@ export class SceneView {
       }
     }
 
-    // 3. 3D Thrust Direction Arrow Helper on the Satellite
+    // 3. 3D Thrust Direction Arrow Helper on the Satellite (Neon Green)
     if (this.thrustArrow) {
       this.dynamic.remove(this.thrustArrow);
       this.thrustArrow.dispose();
@@ -1334,11 +1670,17 @@ export class SceneView {
           tScene,
           satPos,
           2.6,
-          0x10b981,
+          COL.neonGreen,
           0.8,
           0.45
         );
         this.dynamic.add(this.thrustArrow);
+        
+        // Update thruster plume exhaust direction (opposite to thrust per Newton's 3rd Law)
+        const s = this.sats[satIndex];
+        if (s && s.thrusterPlume) {
+          s.thrusterPlume.setExhaustDirection(tScene, satPos);
+        }
       }
     }
   }
@@ -1525,12 +1867,26 @@ export class SceneView {
 
   public firePlume(satIndex = 0): void {
     const s = this.sats[satIndex];
-    if (!s) return;
-    this.plume.position.copy(s.group.position);
-    this.plume.quaternion.copy(s.group.quaternion);
-    this.plume.translateZ(-0.9);
-    this.plume.rotateX(Math.PI / 2);
-    this._plumeT = 1;
+    if (!s || !s.thrusterPlume) return;
+    
+    // Get the satellite's velocity direction (thrust is opposite to exhaust)
+    // The plume will be updated in the render loop with the correct exhaust direction
+    s.thrusterPlume.setVisible(true);
+    s.thrusterPlume.startEmission();
+  }
+
+  public stopPlume(satIndex = 0): void {
+    const s = this.sats[satIndex];
+    if (!s || !s.thrusterPlume) return;
+    s.thrusterPlume.stopEmission();
+  }
+
+  public updateThrusterPlumes(dtReal: number, camDist: number): void {
+    this.sats.forEach(s => {
+      if (s.thrusterPlume) {
+        s.thrusterPlume.update(dtReal, camDist);
+      }
+    });
   }
 
   public setCounts(satN: number, debN: number): void {
