@@ -1,7 +1,7 @@
 :root {
   /* Layout Dimensions */
   --rail-w: 260px;
-  --panel-w: 292px;
+  --panel-w: 310px;
   --bar-h: 50px;
 
   /* Dark Theme Tokens (Default) */
@@ -899,24 +899,50 @@ body[data-cinema="true"] .panel {
   background: var(--crit-bg);
 }
 
+/* Accessibility Utility: Screen Reader Only (Completely Hidden Visually) */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 /* Minimal 2-item Visual Key */
 .key-block {
-  padding: 10px 16px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.legend-header {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--dim-2);
+  margin-bottom: 6px;
+  text-transform: uppercase;
 }
 
 .visual-key-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--dim);
   font-family: var(--mono);
+  user-select: none;
 }
 
 .key-item {
   display: flex;
   align-items: center;
   gap: 5px;
+  pointer-events: none;
 }
 
 .key-item.blue {
@@ -955,8 +981,17 @@ body[data-cinema="true"] .panel {
   margin-bottom: 10px;
 }
 
+.playback-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .rates {
   display: flex;
+  flex: 1;
+  height: 28px;
   border: 1px solid var(--line);
   border-radius: 4px;
   overflow: hidden;
@@ -967,9 +1002,19 @@ body[data-cinema="true"] .panel {
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 600;
-  padding: 6px 10px;
+  flex: 1;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   color: var(--dim);
   border-right: 1px solid var(--line);
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  background: transparent;
+  cursor: pointer;
   transition: 0.12s;
 }
 
@@ -986,12 +1031,23 @@ body[data-cinema="true"] .panel {
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 700;
-  padding: 6px 14px;
+  height: 28px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 4px;
   background: var(--panel-2);
   border: 1px solid var(--line);
   color: var(--text);
+  cursor: pointer;
   transition: 0.14s;
+  white-space: nowrap;
+}
+
+.pause-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .pause-btn:hover {

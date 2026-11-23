@@ -95,6 +95,19 @@ function removeDestroyedSatellite(kind: 'sat' | 'deb', index: number): void {
     s.lifecycle = 'REMOVED';
     view.purgeSatellite(index);
     ui.toast(`REMOVED ${s.name} FROM ROSTER`);
+    if (S.primary === index) {
+      const nextIdx = S.sats.findIndex((st, i) => i < S.satN && st.lifecycle !== 'REMOVED');
+      if (nextIdx !== -1) {
+        S.primary = nextIdx;
+      }
+    }
+    ui.setCatalog(S.sats.slice(0, S.satN), S.debris.slice(0, S.debN), S.risks);
+    ui.setCounts(S.satN, S.debN);
+  } else if (kind === 'deb' && S.debris[index]) {
+    const d = S.debris[index];
+    d.lifecycle = 'REMOVED';
+    view.purgeDebris(index);
+    ui.toast(`REMOVED ${d.name} FROM ROSTER`);
     ui.setCatalog(S.sats.slice(0, S.satN), S.debris.slice(0, S.debN), S.risks);
     ui.setCounts(S.satN, S.debN);
   }
@@ -125,6 +138,17 @@ if (ecoBtn) {
     ecoBtn.textContent = S.ecoMode ? 'ECO: ON' : 'ECO';
     ecoBtn.setAttribute('aria-pressed', S.ecoMode ? 'true' : 'false');
     ui.toast(S.ecoMode ? 'Eco Mode Enabled (30 FPS, 1.0x DPR)' : 'High Performance Enabled (60 FPS, HiDPI)');
+  });
+}
+
+let earthLightingMode: 'full-lit' | 'day-night' = 'full-lit';
+const earthLightBtn = $('earthLightBtn');
+if (earthLightBtn) {
+  earthLightBtn.addEventListener('click', () => {
+    earthLightingMode = earthLightingMode === 'full-lit' ? 'day-night' : 'full-lit';
+    view.setEarthLighting(earthLightingMode);
+    ui.setEarthLighting(earthLightingMode);
+    ui.toast(earthLightingMode === 'full-lit' ? 'Earth Illumination: FULL LIT' : 'Earth Illumination: DAY / NIGHT');
   });
 }
 
@@ -435,7 +459,20 @@ function selectObject(kind: 'sat' | 'deb', index: number, focus: boolean): void 
       const st = stateAt(body, S.simMs);
       if (st) {
         const p = scenePos(st.r);
-        const d = kind === 'sat' ? 4.2 : 3.2;
+        let d = 36.0;
+        const sc = scenarioFor(S.primary);
+        if (sc && S.sats[sc.satIndex] && S.debris[sc.debIndex]) {
+          const sSt = stateAt(S.sats[sc.satIndex], S.simMs);
+          const dSt = stateAt(S.debris[sc.debIndex], S.simMs);
+          if (sSt && dSt) {
+            const pairDist = Math.hypot(
+              (sSt.r[0] - dSt.r[0]) * KM,
+              (sSt.r[1] - dSt.r[1]) * KM,
+              (sSt.r[2] - dSt.r[2]) * KM
+            );
+            d = Math.max(36.0, pairDist * 1.6);
+          }
+        }
         view.focusOn(st.r, d);
         rig.focusOnObject(p, body.name, kind, index, d, p.clone().normalize());
         S.follow = true;
@@ -459,7 +496,20 @@ function focusSelected(): void {
   const st = body && stateAt(body, S.simMs);
   if (!st || !body) return;
   const p = scenePos(st.r);
-  const d = S.sel.kind === 'sat' ? 4.2 : 3.2;
+  let d = 36.0;
+  const sc = scenarioFor(S.primary);
+  if (sc && S.sats[sc.satIndex] && S.debris[sc.debIndex]) {
+    const sSt = stateAt(S.sats[sc.satIndex], S.simMs);
+    const dSt = stateAt(S.debris[sc.debIndex], S.simMs);
+    if (sSt && dSt) {
+      const pairDist = Math.hypot(
+        (sSt.r[0] - dSt.r[0]) * KM,
+        (sSt.r[1] - dSt.r[1]) * KM,
+        (sSt.r[2] - dSt.r[2]) * KM
+      );
+      d = Math.max(36.0, pairDist * 1.6);
+    }
+  }
   view.focusOn(st.r, d);
   rig.focusOnObject(p, body.name, S.sel.kind, S.sel.index, d, p.clone().normalize());
   S.follow = true;
@@ -525,9 +575,10 @@ function executeBurn(): void {
   const plan = S.plan;
 
   // Realistic calibrated burn in m/s (plan.dv is already in m/s!)
-  const at = Math.max(S.simMs, plan.burnMs);
+  // Trigger burn immediately to clear trajectory window
+  const at = S.simMs;
   S.fuel[S.primary] = Math.max(0, S.fuel[S.primary] - plan.dv);
-  S.burns[S.primary] = { plan, at, fired: false, satIndex: S.primary };
+  S.burns[S.primary] = { plan, at, fired: true, satIndex: S.primary };
 
   ui.toast(`BURNING ENGINE · ${plan.short} · ${plan.dv.toFixed(2)} m/s`);
   ui.setPlan(plan, S.fuel[S.primary], 'MANEUVER EXECUTED');
@@ -712,7 +763,13 @@ function loop(now: number): void {
   const debrisUpdated = true;
 
   for (let i = 0; i < S.debN; i++) {
-    const st = stateAt(S.debris[i], S.simMs);
+    const deb = S.debris[i];
+    if (deb && (deb.lifecycle === 'DESTROYED' || deb.lifecycle === 'REMOVED')) {
+      debPos[i] = null;
+      debVel[i] = null;
+      continue;
+    }
+    const st = stateAt(deb, S.simMs);
     debPos[i] = st ? st.r : null;
     debVel[i] = st ? st.v : null;
   }
@@ -775,9 +832,9 @@ function loop(now: number): void {
       const atTcaDirect = Math.abs(tcaSecDirect) <= 1.2 && (sc.ev?.miss || 1.0) <= COLLISION_RADIUS_KM;
 
       const burn = S.burns[sc.satIndex];
-      const burnFired = burn && burn.fired;
+      const isDodgeActive = S.autoDodgeEnabled || (burn && burn.fired);
 
-      if ((colliding || atTcaDirect) && !burnFired && !S.collisionTriggered) {
+      if ((colliding || atTcaDirect) && !isDodgeActive && !S.collisionTriggered) {
         S.collisionTriggered = true;
         satObj.lifecycle = 'COLLIDING';
         debObj.lifecycle = 'COLLIDING';
@@ -790,6 +847,7 @@ function loop(now: number): void {
           satObj.lifecycle = 'DESTROYED';
           debObj.lifecycle = 'DESTROYED';
           view.purgeSatellite(sc.satIndex);
+          view.purgeDebris(sc.debIndex);
           ui.setCatalog(S.sats.slice(0, S.satN), S.debris.slice(0, S.debN), S.risks);
           ui.setCounts(S.satN, S.debN);
           setTimeout(() => {

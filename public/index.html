@@ -9,10 +9,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="/assets/index-xn6eYSv0.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/vendor-three-C5OiqLEU.js">
+  <script type="module" crossorigin src="/assets/index-DVa0kein.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vendor-three-Bo1eU3fC.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-sgp4-DzoOSkRs.js">
-  <link rel="stylesheet" crossorigin href="/assets/index-irUURph8.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-CVAI0qx6.css">
 </head>
 <body>
 <div id="app">
@@ -31,6 +31,7 @@
       <span class="tag ok" id="linkTag">SGP4 ACTIVE</span>
     </div>
     <div class="bar-right">
+      <button class="ghost" id="earthLightBtn" title="Toggle Earth Illumination (Full Lit vs Day/Night)"><span id="earthLightIcon">☀️</span> <span id="earthLightText">FULL LIT</span></button>
       <button class="ghost" id="ecoBtn" title="Toggle Battery-Saver Eco Mode (30 FPS, 1.0x DPR)" aria-pressed="false">ECO</button>
       <button class="ghost" id="cinemaBtn" title="Toggle Cinema View (Z)">CINEMA</button>
       <button class="ghost" id="helpBtn" title="Navigation Guide">HELP</button>
@@ -83,14 +84,6 @@
       <button id="exitCinemaBtn" class="exit-cinema-btn" aria-label="Exit Cinema Mode (Esc or Z)" title="Exit Cinema Mode (Esc or Z)">
         <span aria-hidden="true">✕</span> Exit Cinema
       </button>
-
-      <!-- Active Camera Frame Mode Pill (Bottom Right) -->
-      <div id="camModePill" class="cam-mode-pill" role="status" aria-live="polite">
-        <span class="mode-tag" id="camModeTag">PLANET VIEW</span>
-        <span class="mode-sep" aria-hidden="true">•</span>
-        <span class="mode-target" id="camModeTarget">Earth Center</span>
-        <button id="returnEarthBtn" class="return-btn" style="display:none;" title="Return to Earth View (R or Esc)">Return to Earth ⌖</button>
-      </div>
 
       <!-- WebGL Recovery Banner -->
       <div id="webglLostBanner" class="webgl-lost-banner" hidden role="alert">
@@ -185,6 +178,7 @@
 
       <!-- 4. MINIMAL 2-ITEM VISUAL KEY -->
       <section class="block key-block">
+        <div class="legend-header">TRAJECTORY KEY</div>
         <div class="visual-key-row">
           <span class="key-item blue"><svg width="18" height="8" viewBox="0 0 18 8" aria-hidden="true"><line x1="0" y1="4" x2="13" y2="4" stroke="currentColor" stroke-width="2"/><polygon points="13,1 18,4 13,7" fill="currentColor"/></svg> Default Orbit</span>
           <span class="key-item green"><svg width="18" height="8" viewBox="0 0 18 8" aria-hidden="true"><line x1="0" y1="4" x2="13" y2="4" stroke="currentColor" stroke-width="2"/><polygon points="13,1 18,4 13,7" fill="currentColor"/></svg> AI Dodge</span>

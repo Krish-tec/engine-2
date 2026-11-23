@@ -54,8 +54,8 @@ export class OrbitRig {
   public static readonly PLANET_MIN_DIST = 76.0;
   public static readonly PLANET_MAX_DIST = 420.0;
   public static readonly OBJECT_MIN_DIST = 0.18;
-  public static readonly OBJECT_MAX_DIST = 45.0;
-  public static readonly OBJECT_RELEASE_BOUNDARY = 42.0;
+  public static readonly OBJECT_MAX_DIST = 95.0;
+  public static readonly OBJECT_RELEASE_BOUNDARY = 90.0;
   public static readonly PLANET_HANDOFF_BOUNDARY = 82.0;
 
   // Callbacks for main loop integration
@@ -593,7 +593,7 @@ export class OrbitRig {
   /**
    * Backward-compatible legacy focusOn method.
    */
-  public focusOn(point: THREE.Vector3, dist = 4.2, dir: THREE.Vector3 | null = null): void {
+  public focusOn(point: THREE.Vector3, dist = 36.0, dir: THREE.Vector3 | null = null): void {
     this.focusOnObject(point, 'Tracked Object', 'sat', 0, dist, dir);
   }
 
@@ -607,7 +607,7 @@ export class OrbitRig {
     name: string,
     kind: 'sat' | 'deb' = 'sat',
     index: number = 0,
-    customDist: number = 4.2,
+    customDist: number = 36.0,
     dir: THREE.Vector3 | null = null
   ): void {
     this._frameMode = 'OBJECT_CENTRIC';

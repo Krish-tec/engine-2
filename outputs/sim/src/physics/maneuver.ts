@@ -87,9 +87,9 @@ export function planManeuver(
 
   // Evaluate lead burn fractions
   for (const frac of [0.45, 0.65, 0.82]) {
-    const lead = Math.max(60, Math.min(dtTca - 60, dtTca * frac));
+    const lead = Math.max(10, Math.min(Math.max(10, dtTca - 2), dtTca * frac));
     if (lead <= 0) continue;
-    const burnMs = (nowMs + lead * 1000) as EpochMs;
+    const burnMs = Math.max(nowMs, (tcaEpoch - lead * 1000) as EpochMs) as EpochMs;
     const bs = stateAt(satB, burnMs as number);
     if (!bs) continue;
 

@@ -70,7 +70,7 @@ describe('Dual-Reference-Frame Camera Controller (OrbitRig)', () => {
     expect(cam.position.length()).toBeGreaterThanOrEqual(OrbitRig.R_EARTH + 0.8 - 1e-4);
   });
 
-  it('releases OBJECT_CENTRIC and returns to PLANET_CENTRIC when zooming out past 42.0 units (hysteresis)', () => {
+  it('releases OBJECT_CENTRIC and returns to PLANET_CENTRIC when zooming out past OBJECT_RELEASE_BOUNDARY units (hysteresis)', () => {
     const satPos = new THREE.Vector3(70, 0, 0);
     rig.focusOnObject(satPos, 'Cartosat-3', 'sat', 0, 4.2);
 
@@ -81,8 +81,8 @@ describe('Dual-Reference-Frame Camera Controller (OrbitRig)', () => {
 
     expect(rig.frameMode).toBe('OBJECT_CENTRIC');
 
-    // Zoom out past release boundary (42.0)
-    rig.zoom(2000); // Positive delta expands distance
+    // Zoom out past release boundary (90.0)
+    rig.zoom(4000); // Positive delta expands distance past OBJECT_RELEASE_BOUNDARY (90.0)
 
     // Should automatically reset to PLANET_CENTRIC
     expect(rig.frameMode).toBe('PLANET_CENTRIC');

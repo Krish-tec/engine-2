@@ -202,7 +202,7 @@ export class UI {
       rows
         .map(
           o => {
-            const isDestroyed = o.lifecycle === 'REMOVED' || o.lifecycle === 'DISSOLVING' || o.lifecycle === 'DESTROYED';
+            const isDestroyed = o.lifecycle === 'DISSOLVING' || o.lifecycle === 'DESTROYED';
             const pillText = isDestroyed ? 'DESTROYED' : o.kind === 'sat' ? 'PROTECTED' : o.risk === 'crit' ? 'DANGER' : 'SAFE';
             const pillClass = isDestroyed ? 'danger' : o.kind === 'sat' ? 'protected' : o.risk === 'crit' ? 'danger' : 'safe';
             const trashButton = isDestroyed
@@ -455,6 +455,18 @@ export class UI {
       if (tag) tag.textContent = 'PLANET VIEW';
       if (target) target.textContent = 'Earth Center';
       if (returnBtn) returnBtn.style.display = 'none';
+    }
+  }
+
+  public setEarthLighting(mode: 'full-lit' | 'day-night'): void {
+    const icon = $('earthLightIcon');
+    const text = $('earthLightText');
+    if (mode === 'full-lit') {
+      if (icon) icon.textContent = '☀️';
+      if (text) text.textContent = 'FULL LIT';
+    } else {
+      if (icon) icon.textContent = '🌗';
+      if (text) text.textContent = 'DAY / NIGHT';
     }
   }
 }

@@ -59,6 +59,100 @@ export function createCraggyDebrisGeometry(): THREE.BufferGeometry {
   return geo;
 }
 
+export function createEarthFallbackTexture(): THREE.CanvasTexture {
+  const w = 1024;
+  const h = 512;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d')!;
+
+  // Deep Blue Oceans with subtle equator gradient
+  const oceanGrad = g.createLinearGradient(0, 0, 0, h);
+  oceanGrad.addColorStop(0, '#0c2744');
+  oceanGrad.addColorStop(0.3, '#143c68');
+  oceanGrad.addColorStop(0.5, '#1b4d82');
+  oceanGrad.addColorStop(0.7, '#143c68');
+  oceanGrad.addColorStop(1, '#0c2744');
+  g.fillStyle = oceanGrad;
+  g.fillRect(0, 0, w, h);
+
+  // Continents shapes (Africa, Europe, Americas, Asia, Australia)
+  g.fillStyle = '#2d5e3f';
+
+  // Africa & Mediterranean
+  g.beginPath();
+  g.ellipse(w * 0.52, h * 0.50, w * 0.08, h * 0.20, 0.1, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.ellipse(w * 0.52, h * 0.28, w * 0.07, h * 0.11, 0, 0, Math.PI * 2);
+  g.fill();
+
+  // Americas
+  g.beginPath();
+  g.ellipse(w * 0.24, h * 0.32, w * 0.09, h * 0.15, -0.2, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.ellipse(w * 0.30, h * 0.65, w * 0.065, h * 0.20, 0.2, 0, Math.PI * 2);
+  g.fill();
+
+  // Eurasia & India
+  g.beginPath();
+  g.ellipse(w * 0.72, h * 0.30, w * 0.16, h * 0.16, 0.05, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.ellipse(w * 0.68, h * 0.46, w * 0.035, h * 0.07, 0, 0, Math.PI * 2);
+  g.fill();
+
+  // Australia
+  g.beginPath();
+  g.ellipse(w * 0.82, h * 0.72, w * 0.06, h * 0.07, 0, 0, Math.PI * 2);
+  g.fill();
+
+  // Desert / Tan Highlands
+  g.fillStyle = '#6e6244';
+  g.beginPath();
+  g.ellipse(w * 0.52, h * 0.40, w * 0.06, h * 0.07, 0, 0, Math.PI * 2); // Sahara
+  g.fill();
+  g.beginPath();
+  g.ellipse(w * 0.63, h * 0.38, w * 0.04, h * 0.05, 0, 0, Math.PI * 2); // Arabia
+  g.fill();
+
+  // Polar ice caps
+  g.fillStyle = '#f4f9ff';
+  g.fillRect(0, 0, w, h * 0.07);
+  g.fillRect(0, h * 0.91, w, h * 0.09);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+export function createCloudFallbackTexture(): THREE.CanvasTexture {
+  const w = 512;
+  const h = 256;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d')!;
+
+  g.fillStyle = 'rgba(0,0,0,0)';
+  g.fillRect(0, 0, w, h);
+
+  g.fillStyle = 'rgba(255, 255, 255, 0.42)';
+  for (let i = 0; i < 24; i++) {
+    const cx = (i * 47) % w;
+    const cy = 35 + (i * 29) % (h - 70);
+    g.beginPath();
+    g.ellipse(cx, cy, 35 + (i % 5) * 12, 12 + (i % 3) * 6, (i * 0.3), 0, Math.PI * 2);
+    g.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 export const toScene = (r: number[]): THREE.Vector3 => new THREE.Vector3(r[0] * KM, r[2] * KM, -r[1] * KM);
 const SAFE_UNIT = 5 * KM * EXAG;
 
@@ -172,6 +266,11 @@ export class SceneView {
   public sunDir: THREE.Vector3 = new THREE.Vector3();
   public focusPoint: THREE.Vector3 = new THREE.Vector3();
   public focusDist: number = 26;
+  public earthLightingMode: 'full-lit' | 'day-night' = 'full-lit';
+  public sunLight!: THREE.DirectionalLight;
+  public ambientLight!: THREE.AmbientLight;
+  public hemiLight!: THREE.HemisphereLight;
+  public earthMat!: THREE.MeshPhongMaterial;
 
   private earth!: THREE.Mesh;
   private clouds!: THREE.Mesh;
@@ -281,36 +380,70 @@ export class SceneView {
   private _buildEnvironment(): void {
     const loader = new THREE.TextureLoader();
     const base = 'https://threejs.org/examples/textures/planets/';
-    const L = (f: string, srgb = true) => {
-      const t = loader.load(base + f, undefined, undefined, () => {});
-      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = 4;
-      return t;
-    };
+    const proceduralEarthTex = createEarthFallbackTexture();
+    const proceduralCloudTex = createCloudFallbackTexture();
 
     const geo = new THREE.SphereGeometry(63.71, 128, 96);
     const mat = new THREE.MeshPhongMaterial({
       color: 0xffffff,
-      map: L('earth_atmos_2048.jpg'),
-      normalMap: L('earth_normal_2048.jpg', false),
+      map: proceduralEarthTex,
       normalScale: new THREE.Vector2(0.85, 0.85),
-      specularMap: L('earth_specular_2048.jpg', false),
-      specular: new THREE.Color(0x2a3a48),
-      shininess: 18,
-      emissiveMap: L('earth_lights_2048.png'),
-      emissive: new THREE.Color(0xffffff),
-      emissiveIntensity: 0.4,
+      shininess: 16,
+      emissive: new THREE.Color(0x334455),
+      emissiveIntensity: 0.5,
     });
+    this.earthMat = mat;
+
+    // Asynchronously enhance with high-resolution satellite imagery when available
+    loader.load(
+      base + 'earth_atmos_2048.jpg',
+      (t) => {
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 4;
+        mat.map = t;
+        mat.needsUpdate = true;
+      },
+      undefined,
+      () => {}
+    );
+    loader.load(
+      base + 'earth_normal_2048.jpg',
+      (t) => {
+        mat.normalMap = t;
+        mat.needsUpdate = true;
+      },
+      undefined,
+      () => {}
+    );
+    loader.load(
+      base + 'earth_lights_2048.png',
+      (t) => {
+        mat.emissiveMap = t;
+        mat.needsUpdate = true;
+      },
+      undefined,
+      () => {}
+    );
+
     this.earth = new THREE.Mesh(geo, mat);
     this.earthGroup.add(this.earth);
 
     const cloudMat = new THREE.MeshPhongMaterial({
-      map: L('earth_clouds_1024.png'),
+      map: proceduralCloudTex,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.45,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
+    loader.load(
+      base + 'earth_clouds_1024.png',
+      (t) => {
+        cloudMat.map = t;
+        cloudMat.needsUpdate = true;
+      },
+      undefined,
+      () => {}
+    );
     this.clouds = new THREE.Mesh(new THREE.SphereGeometry(63.95, 96, 64), cloudMat);
     this.earthGroup.add(this.clouds);
 
@@ -355,10 +488,18 @@ export class SceneView {
     );
 
     this.sunDir = new THREE.Vector3(0.72, 0.42, 0.55).normalize();
-    const sun = new THREE.DirectionalLight(0xfff3e0, 2.6);
-    sun.position.copy(this.sunDir).multiplyScalar(500);
-    this.scene.add(sun);
-    this.scene.add(new THREE.AmbientLight(0x223044, 0.5));
+    this.sunLight = new THREE.DirectionalLight(0xfff5e6, 1.8);
+    this.sunLight.position.copy(this.sunDir).multiplyScalar(500);
+    this.scene.add(this.sunLight);
+
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 2.2);
+    this.scene.add(this.ambientLight);
+
+    this.hemiLight = new THREE.HemisphereLight(0xd0e8ff, 0x3a4a5a, 1.4);
+    this.scene.add(this.hemiLight);
+
+    // Default to Full Lit so the Earth is immediately visible and radiant everywhere
+    this.setEarthLighting('full-lit');
 
     const sunSprite = new THREE.Sprite(
       new THREE.SpriteMaterial({
@@ -1303,6 +1444,70 @@ export class SceneView {
       shrapnelRot,
       onComplete,
     });
+  }
+
+  public setEarthLighting(mode: 'full-lit' | 'day-night'): void {
+    this.earthLightingMode = mode;
+    if (mode === 'full-lit') {
+      if (this.ambientLight) {
+        this.ambientLight.intensity = 2.4;
+        this.ambientLight.color.setHex(0xffffff);
+      }
+      if (this.hemiLight) {
+        this.hemiLight.intensity = 1.4;
+      }
+      if (this.sunLight) {
+        this.sunLight.intensity = 1.8;
+      }
+      if (this.earthMat) {
+        this.earthMat.shininess = 6;
+        this.earthMat.emissive.setHex(0x556677);
+        this.earthMat.emissiveIntensity = 0.55;
+      }
+    } else {
+      // Realistic Day / Night lighting
+      if (this.ambientLight) {
+        this.ambientLight.intensity = 0.22;
+        this.ambientLight.color.setHex(0x1a2638);
+      }
+      if (this.hemiLight) {
+        this.hemiLight.intensity = 0.35;
+      }
+      if (this.sunLight) {
+        this.sunLight.intensity = 2.8;
+      }
+      if (this.earthMat) {
+        this.earthMat.shininess = 25;
+        this.earthMat.emissive.setHex(0x0a101d);
+        this.earthMat.emissiveIntensity = 0.15;
+      }
+    }
+  }
+
+  public purgeDebris(index: number): void {
+    const d = this.debris[index];
+    if (d && d.body) {
+      d.body.lifecycle = 'REMOVED';
+    }
+    if (this.debrisInstancedMesh) {
+      this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._zeroScale);
+      this.debrisInstancedMesh.setMatrixAt(index, this._dummyMat);
+      this.debrisInstancedMesh.instanceMatrix.needsUpdate = true;
+    }
+    if (this.debrisArrowInstancedMesh) {
+      this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._zeroScale);
+      this.debrisArrowInstancedMesh.setMatrixAt(index, this._dummyMat);
+      this.debrisArrowInstancedMesh.instanceMatrix.needsUpdate = true;
+    }
+    if (this.selectedDebrisMesh && this.selectedDebrisMesh.visible) {
+      this.selectedDebrisMesh.visible = false;
+    }
+    if (this.threatRing && this.threatRing.visible) {
+      this.threatRing.visible = false;
+    }
+    if (this.linkLine && this.linkLine.visible) {
+      this.linkLine.visible = false;
+    }
   }
 
   public purgeSatellite(index: number): void {

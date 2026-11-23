@@ -36,6 +36,7 @@ export function filterObjects(
   const rank = (o: CatalogRowItem) => (o.kind === 'sat' ? 0 : isThreat(o) ? 1 : 2);
 
   return items
+    .filter(o => o.lifecycle !== 'REMOVED')
     .filter(o => (o.kind === 'sat' ? o.index < satN : o.index < debN || isThreat(o)))
     .filter(o => !q || o.name.toLowerCase().includes(q) || String(o.norad).includes(q))
     .sort((a, b) => rank(a) - rank(b) || a.index - b.index)
