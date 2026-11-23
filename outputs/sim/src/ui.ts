@@ -93,8 +93,9 @@ export class UI {
       speedSlider.addEventListener('input', () => {
         let val = Number(speedSlider.value);
         // Map 0 to strictly 1x real-time; otherwise multiple of 20
-        let rate = val <= 0 ? 1 : val;
+        let rate = val <= 0 ? 1 : Math.min(500, val);
         if (speedVal) speedVal.textContent = `${rate}×`;
+        speedSlider.setAttribute('aria-valuenow', String(rate));
         const pct = (val / 500) * 100;
         speedSlider.style.setProperty('--slider-pct', `${pct}%`);
         this.h.rate?.(rate);
@@ -150,10 +151,7 @@ export class UI {
     addEventListener('keydown', e => {
       const target = e.target as HTMLElement;
       if (e.key === '?' && !target.matches('input,textarea')) this.toggleHelp();
-      if ((e.key === 'z' || e.key === 'Z') && !target.matches('input,textarea')) {
-        this.toggleCinema();
-        this.h.cinema?.();
-      }
+      // Note: KeyZ is handled centrally in controls.ts via onToggleCinema to avoid double-toggle
       if (e.code === 'Space' && !target.matches('input,textarea')) {
         e.preventDefault();
         this.h.pause?.();
@@ -401,13 +399,15 @@ export class UI {
   public setRate(r: number): void {
     const slider = $('speedSlider') as HTMLInputElement | null;
     const speedVal = $('speedVal');
+    const safeRate = r <= 0 ? 1 : Math.min(500, r);
     if (slider) {
-      slider.value = String(r);
-      const pct = (r / 500) * 100;
+      slider.value = String(r <= 1 ? 0 : r);
+      const pct = (Number(slider.value) / 500) * 100;
       slider.style.setProperty('--slider-pct', `${pct}%`);
+      slider.setAttribute('aria-valuenow', String(safeRate));
     }
     if (speedVal) {
-      speedVal.textContent = `${r}×`;
+      speedVal.textContent = `${safeRate}×`;
     }
   }
 

@@ -522,10 +522,11 @@ function tleAge(body: SpaceBody): number {
 function computeApproaches(satIndex: number): any[] {
   const out: any[] = [];
   const satB = S.sats[satIndex];
-  if (!satB) return out;
+  if (!satB || satB.lifecycle === 'DESTROYED' || satB.lifecycle === 'REMOVED') return out;
   const maxDeb = Math.min(S.debN, S.debris.length);
   for (let i = 0; i < maxDeb; i++) {
     const debB = S.debris[i];
+    if (!debB || debB.lifecycle === 'DESTROYED' || debB.lifecycle === 'REMOVED') continue;
     // Astrodynamic orbital shell pre-filter:
     // Prune debris whose nominal altitude difference exceeds 200 km unless synthetic encounter target
     if (satB.alt && debB.alt && Math.abs(satB.alt - debB.alt) > 200 && !(debB as any)._synth) {
@@ -537,6 +538,8 @@ function computeApproaches(satIndex: number): any[] {
   // Fallback in case altitude pre-filtering yielded zero candidates (e.g. custom or sparse catalogs)
   if (out.length === 0 && maxDeb > 0) {
     for (let i = 0; i < Math.min(10, maxDeb); i++) {
+      const debB = S.debris[i];
+      if (!debB || debB.lifecycle === 'DESTROYED' || debB.lifecycle === 'REMOVED') continue;
       const ev = findApproach(satB, S.debris[i], S.t0, 12);
       if (ev && isFinite(ev.miss)) out.push({ debIndex: i, ev });
     }
@@ -551,6 +554,9 @@ function ensureScenarios(): void {
   S.scenarios = [];
 
   for (let i = 0; i < S.satN; i++) {
+    const sat = S.sats[i];
+    if (!sat || sat.lifecycle === 'DESTROYED' || sat.lifecycle === 'REMOVED') continue;
+
     const list = S.approaches[i] || computeApproaches(i);
     const candidate = list.find((a: any) => !used.has(a.debIndex)) || list[0];
     if (!candidate) continue;
@@ -558,6 +564,7 @@ function ensureScenarios(): void {
     let ev = candidate.ev;
     let derived = !!ev.derived;
     const deb = S.debris[candidate.debIndex];
+    if (!deb || deb.lifecycle === 'DESTROYED' || deb.lifecycle === 'REMOVED') continue;
 
     // Ensure encounter crosses into the < 5 km keep-out corridor for high-impact educational demonstration
     if (ev.miss > 2.0 && !(deb as any)._derived) {
@@ -930,7 +937,7 @@ for (let i = 0; i < 32; i++) {
 
 const _debTangents: (THREE.Vector3 | null)[] = [];
 const _debTanVecs: THREE.Vector3[] = [];
-for (let i = 0; i < 256; i++) {
+for (let i = 0; i < 420; i++) {
   _debTanVecs.push(new THREE.Vector3());
   _debTangents.push(null);
 }
@@ -977,13 +984,30 @@ function loop(now: number): void {
     let satV = st ? st.v : null;
 
     // Mathematical coupling: satellite travels directly on the green curve during dodge!
-    if (currentAvoidanceBundle && currentAvoidanceSatIndex === i && S.autoDodgeEnabled) {
+    // Enabled under Auto-Avoidance AI, choreographed dodge demos, OR explicit manual burn trigger
+    if (
+      currentAvoidanceBundle &&
+      currentAvoidanceSatIndex === i &&
+      (S.autoDodgeEnabled || S.demoChoreography.active || Boolean(S.burns[i]?.fired))
+    ) {
       const evalRes = currentAvoidanceBundle.evaluateAt(S.simMs);
       if (evalRes.inDodgeWindow) {
-        if (st) {
+        if (
+          st &&
+          evalRes.pos &&
+          Number.isFinite(evalRes.pos[0]) &&
+          Number.isFinite(evalRes.pos[1]) &&
+          Number.isFinite(evalRes.pos[2])
+        ) {
           st = { ...st, rScene: evalRes.pos };
         }
-        satV = evalRes.defaultDir;
+        if (
+          evalRes.defaultDir &&
+          evalRes.defaultDir.length === 3 &&
+          evalRes.defaultDir[0] ** 2 + evalRes.defaultDir[1] ** 2 + evalRes.defaultDir[2] ** 2 > 1e-4
+        ) {
+          satV = evalRes.defaultDir;
+        }
       }
     }
 
@@ -1093,6 +1117,14 @@ function loop(now: number): void {
 
         view.triggerCollisionEffect(impactPosKm, sc.satIndex, sc.debIndex, () => {
           if (isCrashDemo) {
+            if (S.demoChoreography.originalRate !== undefined) {
+              S.rate = S.demoChoreography.originalRate;
+              ui.setRate(S.rate);
+            }
+            if (S.demoChoreography.originalAutoDodge !== undefined) {
+              S.autoDodgeEnabled = S.demoChoreography.originalAutoDodge;
+              ui.setAutoDodgeState(S.autoDodgeEnabled);
+            }
             S.demoChoreography.active = false;
             S.demoChoreography.type = null;
           }

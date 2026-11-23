@@ -1,19 +1,26 @@
 import { test, expect } from './fixtures';
 
-test.describe('Flow 5: Timeline Scrub', () => {
-  test('scrubbing/clicking the timeline updates simulation time state', async ({ simPage }) => {
-    const timeline = simPage.locator('#timeline');
-    const box = await timeline.boundingBox();
-    expect(box).not.toBeNull();
+test.describe('Flow 5: Precision Speed Slider & Playback Controls', () => {
+  test('adjusting speed slider updates rate and aria attributes', async ({ simPage }) => {
+    const speedSlider = simPage.locator('#speedSlider');
+    await expect(speedSlider).toBeVisible();
 
-    if (box) {
-      // Click at 70% of timeline width
-      await simPage.mouse.click(box.x + box.width * 0.7, box.y + box.height / 2);
+    // Verify initial slider configuration
+    await expect(speedSlider).toHaveAttribute('min', '0');
+    await expect(speedSlider).toHaveAttribute('max', '500');
 
-      // Verify fill width style updated
-      const timelineFill = simPage.locator('#timelineFill');
-      const style = await timelineFill.getAttribute('style');
-      expect(style).toContain('width:');
-    }
+    // Change speed to 100x via input event
+    await speedSlider.fill('100');
+    await speedSlider.dispatchEvent('input');
+
+    const speedVal = simPage.locator('#speedVal');
+    await expect(speedVal).toHaveText('100×');
+    await expect(speedSlider).toHaveAttribute('aria-valuenow', '100');
+
+    // Map 0 to strictly 1x real-time
+    await speedSlider.fill('0');
+    await speedSlider.dispatchEvent('input');
+    await expect(speedVal).toHaveText('1×');
+    await expect(speedSlider).toHaveAttribute('aria-valuenow', '1');
   });
 });

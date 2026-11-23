@@ -331,8 +331,8 @@ export class OrbitRig {
     const ctrl = e.ctrlKey || e.metaKey;
     const shift = e.shiftKey;
 
-    // 1–9: Direct access to protected satellites #1–#9
-    if (code.startsWith('Digit') || code.startsWith('Numpad')) {
+    // 1–9: Direct access to protected satellites #1–#9 (Top-row digits only; Numpad is reserved for 3D View Presets)
+    if (code.startsWith('Digit')) {
       const char = code.slice(-1);
       const digit = parseInt(char, 10);
       if (!isNaN(digit) && digit >= 1 && digit <= 9 && !shift && !ctrl) {

@@ -1021,41 +1021,42 @@ export class SceneView {
     satBodies.forEach((b, i) => {
       const g = new THREE.Group();
 
-      // 1. Main Spacecraft Bus
-      const bus = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.32), busMat);
+      // 1. Main Spacecraft Bus (Independent cloned material to prevent opacity leaks)
+      const bus = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.32), busMat.clone());
       g.add(bus);
 
       // 2. Gold MLI Thermal Blanketing Panels
-      const mli = new THREE.Mesh(new THREE.BoxGeometry(0.385, 0.22, 0.22), mliMat);
+      const mli = new THREE.Mesh(new THREE.BoxGeometry(0.385, 0.22, 0.22), mliMat.clone());
       g.add(mli);
 
       // 3. Nadir Optical Sensor / Telescope (Earth facing)
-      const nadirTube = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.24, 16), busMat);
+      const nadirTube = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.24, 16), busMat.clone());
       nadirTube.rotation.x = Math.PI / 2;
       nadirTube.position.z = 0.22;
-      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.085, 16), lensMat);
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.085, 16), lensMat.clone());
       lens.position.z = 0.341;
       g.add(nadirTube, lens);
 
       // 4. High-Gain Parabolic Communications Dish & Feed Horn
-      const dish = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.14, 16, 1, true), dishMat);
+      const dish = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.14, 16, 1, true), dishMat.clone());
       dish.rotation.x = -Math.PI / 2;
       dish.position.set(0, 0.24, -0.12);
-      const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.14), busMat);
+      const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.14), busMat.clone());
       feed.rotation.x = -Math.PI / 2;
       feed.position.set(0, 0.24, -0.05);
       g.add(dish, feed);
 
       // 5. Articulated Solar Array Wings with Structural Yokes
-      const yokeL = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.18), yokeMat);
+      const yokeL = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.18), yokeMat.clone());
       yokeL.rotation.z = Math.PI / 2;
       yokeL.position.x = -0.28;
-      const pL = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.018, 0.34), panelMat);
+      const pL = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.018, 0.34), panelMat.clone());
       pL.position.x = -0.72;
 
-      const yokeR = yokeL.clone();
+      const yokeR = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.18), yokeMat.clone());
+      yokeR.rotation.z = Math.PI / 2;
       yokeR.position.x = 0.28;
-      const pR = pL.clone();
+      const pR = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.018, 0.34), panelMat.clone());
       pR.position.x = 0.72;
       g.add(yokeL, pL, yokeR, pR);
 
@@ -1067,9 +1068,14 @@ export class SceneView {
         [0.18, 0.15, -0.15],
       ];
       rcsPositions.forEach(([rx, ry, rz]) => {
-        const rcs = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.035, 0.06, 8), yokeMat);
+        const rcs = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.035, 0.06, 8), yokeMat.clone());
         rcs.position.set(rx, ry, rz);
         g.add(rcs);
+      });
+
+      // Prevent frustum culling from dropping satellite meshes during tight inspection zooms
+      g.traverse(o => {
+        o.frustumCulled = false;
       });
 
       const beacon = new THREE.Sprite(
@@ -1260,12 +1266,26 @@ export class SceneView {
     sats.forEach((st, i) => {
       const s = this.sats[i];
       if (!s || !st) return;
-      const p = (st as any)?.rScene
-        ? this._tmpPos.set((st as any).rScene[0], (st as any).rScene[1], (st as any).rScene[2])
-        : toScene(st.r);
+
+      let p: THREE.Vector3;
+      if (
+        (st as any)?.rScene &&
+        Number.isFinite((st as any).rScene[0]) &&
+        Number.isFinite((st as any).rScene[1]) &&
+        Number.isFinite((st as any).rScene[2])
+      ) {
+        p = this._tmpPos.set((st as any).rScene[0], (st as any).rScene[1], (st as any).rScene[2]);
+      } else if (st.r && Number.isFinite(st.r[0]) && Number.isFinite(st.r[1]) && Number.isFinite(st.r[2])) {
+        p = toScene(st.r);
+      } else {
+        return; // Guard against NaN corrupting mesh transform
+      }
+
       s.group.position.copy(p);
-      const dir = this._tmp.copy(toScene(st.v)).sub(p);
-      if (dir.lengthSq() > 1e-6) s.group.lookAt(p.clone().add(dir));
+      if (st.v && Number.isFinite(st.v[0]) && Number.isFinite(st.v[1]) && Number.isFinite(st.v[2])) {
+        const dir = this._tmp.copy(toScene(st.v)).sub(p);
+        if (dir.lengthSq() > 1e-6) s.group.lookAt(p.clone().add(dir));
+      }
 
       const lifecycle = satLifecycles[i] || s.lifecycle || 'ACTIVE';
       s.lifecycle = lifecycle;
@@ -1281,6 +1301,19 @@ export class SceneView {
         if (s.beacon) s.beacon.visible = false;
         if (s.label) s.label.visible = false;
         return;
+      }
+
+      // Hard Invariant: Active satellites must maintain full scale and opacity
+      if (lifecycle === 'ACTIVE') {
+        s.group.scale.set(1, 1, 1);
+        s.group.traverse(child => {
+          if ((child as THREE.Mesh).isMesh) {
+            const m = (child as THREE.Mesh).material as THREE.Material;
+            if (m && m.opacity < 1.0) {
+              m.opacity = 1.0;
+            }
+          }
+        });
       }
 
       // Dynamic Beacon Cross-Fade: smooth fade-out as camera enters micro-inspection range
@@ -1508,10 +1541,13 @@ export class SceneView {
         if (u >= 1.0) {
           this.dynamic.remove(col.flashMesh);
           col.flashMesh.geometry.dispose();
+          if (col.flashMesh.material) (col.flashMesh.material as THREE.Material).dispose();
           this.dynamic.remove(col.ringMesh);
           col.ringMesh.geometry.dispose();
+          if (col.ringMesh.material) (col.ringMesh.material as THREE.Material).dispose();
           this.dynamic.remove(col.shrapnelMesh);
           col.shrapnelMesh.geometry.dispose();
+          if (col.shrapnelMesh.material) (col.shrapnelMesh.material as THREE.Material).dispose();
 
           if (satObj) {
             satObj.lifecycle = 'DESTROYED';

@@ -8,9 +8,10 @@ test.describe('Flow 4: Maneuver Plan & Burn Execution', () => {
 
     const isEnabled = await executeBtn.isEnabled();
     if (isEnabled) {
-      const fuelBefore = await simPage.locator('#planFuel').innerText();
+      const fuelEl = simPage.locator('#kpiFuel');
+      const fuelBefore = await fuelEl.innerText();
       await executeBtn.click();
-      const fuelAfter = await simPage.locator('#planFuel').innerText();
+      const fuelAfter = await fuelEl.innerText();
       expect(fuelAfter).not.toEqual(fuelBefore);
     } else {
       // In nominal or evaluating state, button must remain safely disabled

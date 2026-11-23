@@ -1480,6 +1480,14 @@ body[data-cinema="true"] .panel {
   color: #b91c1c;
 }
 
+/* Responsive adjustments for tablets (narrow rails to preserve at least 50% 3D viewport) */
+@media (max-width: 960px) and (min-width: 641px) {
+  :root {
+    --rail-w: 200px;
+    --panel-w: 220px;
+  }
+}
+
 /* Responsive adjustments strictly for mobile screens */
 @media (max-width: 640px) {
   #app {
