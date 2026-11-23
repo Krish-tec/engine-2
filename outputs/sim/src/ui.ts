@@ -19,6 +19,7 @@ export interface UIHandlers {
   testCrash?: () => void;
   cinema?: () => void;
   returnToEarth?: () => void;
+  removeDestroyed?: (kind: 'sat' | 'deb', index: number) => void;
 }
 
 export class UI {
@@ -33,9 +34,6 @@ export class UI {
   private satN: number = 5;
   private debN: number = 200;
   private threatIndex?: number;
-  private bp!: HTMLCanvasElement;
-  private bctx!: CanvasRenderingContext2D;
-  private bpSize: number = 220;
   private _tt?: ReturnType<typeof setTimeout>;
 
   constructor(h: UIHandlers) {
@@ -50,6 +48,14 @@ export class UI {
     });
 
     this.objList.addEventListener('click', e => {
+      const trashBtn = (e.target as HTMLElement).closest('.btn-trash') as HTMLElement | null;
+      if (trashBtn) {
+        e.stopPropagation();
+        const kind = trashBtn.dataset.kind as 'sat' | 'deb';
+        const index = +(trashBtn.dataset.index || 0);
+        this.h.removeDestroyed?.(kind, index);
+        return;
+      }
       const row = (e.target as HTMLElement).closest('.obj') as HTMLElement | null;
       if (row) {
         this.h.select?.(row.dataset.kind as 'sat' | 'deb', +(row.dataset.index || 0));
@@ -196,9 +202,12 @@ export class UI {
       rows
         .map(
           o => {
-            const isDestroyed = o.lifecycle === 'REMOVED' || o.lifecycle === 'DISSOLVING';
+            const isDestroyed = o.lifecycle === 'REMOVED' || o.lifecycle === 'DISSOLVING' || o.lifecycle === 'DESTROYED';
             const pillText = isDestroyed ? 'DESTROYED' : o.kind === 'sat' ? 'PROTECTED' : o.risk === 'crit' ? 'DANGER' : 'SAFE';
             const pillClass = isDestroyed ? 'danger' : o.kind === 'sat' ? 'protected' : o.risk === 'crit' ? 'danger' : 'safe';
+            const trashButton = isDestroyed
+              ? `<button class="btn-trash" data-kind="${o.kind}" data-index="${o.index}" aria-label="Remove destroyed ${escapeHtml(o.name)}" title="Remove from list"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>`
+              : '';
             return `
       <div class="obj${this.sel && this.sel.kind === o.kind && this.sel.index === o.index ? ' sel' : ''}${isDestroyed ? ' destroyed' : ''}"
            role="option" data-kind="${o.kind}" data-index="${o.index}" data-risk="${o.risk}">
@@ -207,6 +216,7 @@ export class UI {
         <span class="pill ${pillClass}">
           ${pillText}
         </span>
+        ${trashButton}
       </div>`;
           }
         )
@@ -286,6 +296,8 @@ export class UI {
     pcText?: string;
     tcaMin?: number;
     rt?: RTNCoords;
+    postMiss?: number | null;
+    fuel?: number;
   }): void {
     if (t.debIndex != null) {
       const changed = this.threatIndex !== t.debIndex;
@@ -295,193 +307,73 @@ export class UI {
       if (changed) this.renderList();
     }
 
-    const badge = $('riskChip');
-    const summary = $('encounterSummary');
+    const badge = $('statusBadge') || $('riskChip');
+    const pairEl = $('pairLabel');
+    const missEl = $('kpiMiss') || $('threatMiss');
+    const speedEl = $('kpiSpeed') || $('threatVel');
+    const fuelEl = $('kpiFuel') || $('dodgeBurn');
     const threatSatEl = $('threatSat');
     const threatDebEl = $('threatDeb');
-    const threatMissEl = $('threatMiss');
-    const threatVelEl = $('threatVel');
 
     const isDanger = t.risk === 'crit' || t.miss < 5.0;
 
     if (badge) {
-      badge.textContent = isDanger ? '⚠️ COLLISION RISK DETECTED' : 'ALL SATELLITES SAFE';
+      badge.textContent = isDanger ? '▲ RISK' : '● SAFE';
       badge.className = isDanger ? 'status-badge danger' : 'status-badge safe';
+    }
+
+    if (pairEl) {
+      pairEl.textContent = isDanger ? `${t.sat} · ${t.deb}` : `${t.sat} · Scanning LEO`;
+      pairEl.title = `Active conjunction pair: ${t.sat} & ${t.deb}`;
     }
 
     if (threatSatEl) threatSatEl.textContent = t.sat;
     if (threatDebEl) threatDebEl.textContent = t.deb;
-    if (threatMissEl) threatMissEl.textContent = fmtMiss(t.miss);
-    if (threatVelEl) threatVelEl.textContent = fmtRelSpeed(t.relSpeed);
 
-    if (summary) {
+    if (missEl) {
       if (isDanger) {
-        summary.innerHTML = `<b>${t.sat}</b> is on a close pass with <b>${t.deb}</b>. Without a maneuver, they will pass within <b>${fmtMiss(t.miss)}</b> (unsafe — minimum safe buffer is <b>5.0 km</b>).`;
+        const post = t.postMiss != null ? fmtMiss(t.postMiss) : '7.2 km';
+        missEl.textContent = `${fmtMiss(t.miss)}→${post}`;
       } else {
-        summary.textContent = `All protected satellites are currently operating outside keep-out corridors. Monitoring ${this.debN} debris fragments in Low Earth Orbit.`;
+        missEl.textContent = '> 25 km';
       }
     }
 
-    this.drawRadar(t.rt, isDanger ? t.miss : null);
+    if (speedEl) speedEl.textContent = fmtRelSpeed(t.relSpeed);
+
+    if (fuelEl) {
+      const f = t.fuel != null ? t.fuel : 0;
+      fuelEl.textContent = `${f.toFixed(2)} m/s`;
+    }
   }
 
   private _bplane(): void {
-    this.bp = $('bplane') as HTMLCanvasElement;
-    if (!this.bp) return;
-    this.bctx = this.bp.getContext('2d')!;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.bp.width = 220 * dpr;
-    this.bp.height = 220 * dpr;
-    this.bctx.scale(dpr, dpr);
-    this.bpSize = 220;
-    this.drawRadar();
+    // 2D Target Radar canvas removed in Phase 3 in favor of Swiss-minimal KPI grid
   }
 
   /**
-   * Clean, simplified Visual Target Radar showing 5 km safe zone ring and relative threat position.
+   * 2D Target Radar replaced by Swiss-Minimal KPI grid in Phase 3.
    */
-  public drawRadar(rt?: RTNCoords, missKm?: number | null, postMissKm?: number | null): void {
-    if (!this.bctx) return;
-    const c = this.bctx;
-    const S = this.bpSize;
-    const cx = S / 2;
-    const cy = S / 2;
-    const kmScale = 14; // pixels per km
-
-    c.clearRect(0, 0, S, S);
-
-    // Subtle background circular rings (2.5 km, 5 km, 7.5 km)
-    c.strokeStyle = 'rgba(140, 145, 152, 0.12)';
-    c.lineWidth = 1;
-
-    // 2.5 km inner ring
-    c.beginPath();
-    c.arc(cx, cy, 2.5 * kmScale, 0, Math.PI * 2);
-    c.stroke();
-
-    // Crosshairs
-    c.beginPath();
-    c.moveTo(cx, 10);
-    c.lineTo(cx, S - 10);
-    c.moveTo(10, cy);
-    c.lineTo(S - 10, cy);
-    c.stroke();
-
-    // 5.0 km Keep-Out Zone Ring (Highlighted Safe Buffer)
-    c.beginPath();
-    c.arc(cx, cy, 5.0 * kmScale, 0, Math.PI * 2);
-    c.strokeStyle = 'rgba(239, 68, 68, 0.45)';
-    c.lineWidth = 1.5;
-    c.setLineDash([4, 4]);
-    c.stroke();
-    c.setLineDash([]);
-
-    // 5km label inside circle
-    c.font = '500 8.5px "IBM Plex Mono", monospace';
-    c.fillStyle = 'rgba(239, 68, 68, 0.7)';
-    c.textAlign = 'center';
-    c.fillText('5 km buffer', cx, cy - 5.0 * kmScale - 4);
-
-    // Satellite center marker (protected asset at origin)
-    c.fillStyle = '#ff4f00';
-    c.beginPath();
-    c.arc(cx, cy, 4, 0, Math.PI * 2);
-    c.fill();
-    c.strokeStyle = '#ffffff';
-    c.lineWidth = 1;
-    c.stroke();
-
-    if (rt && missKm != null) {
-      // Relative threat position
-      const tx = Math.max(-cx + 12, Math.min(cx - 12, (rt.t || 0.4) * kmScale));
-      const ty = Math.max(-cy + 12, Math.min(cy - 12, -(rt.n || 0.2) * kmScale));
-
-      // Draw un-maneuvered threat point (Red dot inside danger zone)
-      c.fillStyle = '#ef4444';
-      c.beginPath();
-      c.arc(cx + tx, cy + ty, 5, 0, Math.PI * 2);
-      c.fill();
-      c.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      c.lineWidth = 1.2;
-      c.stroke();
-
-      // Avoidance vector and target point (Green dot shifted outside 5 km)
-      const safeTargetMiss = postMissKm || 7.8;
-      const angle = Math.atan2(ty, tx) + (Math.abs(ty) < 2 ? Math.PI / 2 : 0);
-      const safeX = Math.cos(angle) * (safeTargetMiss * kmScale);
-      const safeY = Math.sin(angle) * (safeTargetMiss * kmScale);
-
-      // Avoidance displacement arrow
-      c.strokeStyle = '#22c55e';
-      c.lineWidth = 1.5;
-      c.setLineDash([3, 2]);
-      c.beginPath();
-      c.moveTo(cx + tx, cy + ty);
-      c.lineTo(cx + safeX, cy + safeY);
-      c.stroke();
-      c.setLineDash([]);
-
-      // Green safe clearance point
-      c.fillStyle = '#22c55e';
-      c.beginPath();
-      c.arc(cx + safeX, cy + safeY, 5, 0, Math.PI * 2);
-      c.fill();
-      c.strokeStyle = '#ffffff';
-      c.lineWidth = 1.2;
-      c.stroke();
-    }
+  public drawRadar(_rt?: RTNCoords, _missKm?: number | null, _postMissKm?: number | null): void {
+    // Intentionally no-op; clean 3-cell KPI grid provides instant miss & speed clearance metrics.
   }
 
   public setPlan(plan: any, _fuelLeft?: number, _state?: string): void {
     const btn = $('executeBtn') as HTMLButtonElement;
     if (btn) btn.disabled = !plan;
 
-    const titleEl = $('planActionTitle');
-    const explEl = $('planExplanation');
-    const shiftEl = $('dodgeShift');
-    const burnEl = $('dodgeBurn');
     const planStateEl = $('planState');
-    const planFuelEl = $('planFuel');
-
-    if (planFuelEl && _fuelLeft != null) {
-      planFuelEl.textContent = `${_fuelLeft.toFixed(1)} m/s`;
-    }
+    const fuelEl = $('kpiFuel') || $('dodgeBurn');
 
     if (!plan) {
       if (planStateEl) planStateEl.textContent = 'STANDBY';
-      if (titleEl) titleEl.textContent = 'STANDBY';
-      if (explEl) {
-        explEl.textContent = 'Continuous autonomous monitoring active. When debris crosses the 5.0 km keep-out threshold, Engine 2 calculates an optimal avoidance trajectory.';
-      }
-      if (shiftEl) shiftEl.textContent = 'Safe Clearance ✓';
-      if (burnEl) burnEl.textContent = '0.00 m/s';
       return;
     }
 
     if (planStateEl) planStateEl.textContent = plan.safe ? 'FEASIBLE' : 'EVALUATING';
 
-    // Determine plain-English action title and explanation
-    let actionTitle = 'Step Sideways (+N)';
-    let explanation = 'Fires a small perpendicular thruster so the satellite shifts lanes and safely bypasses the debris.';
-
-    if (plan.axisKey === 'ALONG-TRACK' || plan.axis.includes('+T')) {
-      actionTitle = 'Speed Up (+T)';
-      explanation = 'Fires an in-track forward pulse so the satellite arrives slightly ahead, creating wide clearance.';
-    } else if (plan.axisKey === 'RADIAL' || plan.axis.includes('+R')) {
-      actionTitle = 'Slight Rise (+R)';
-      explanation = 'Fires a brief radial thruster to adjust orbital altitude away from the debris plane.';
-    }
-
-    if (titleEl) titleEl.textContent = actionTitle;
-    if (explEl) explanation += ` Calibrated burn consumes ${(plan.dv).toFixed(2)} m/s of available budget.`;
-    if (explEl) explEl.textContent = explanation;
-
-    // Realistic fuel burn: plan.dv is already in m/s!
-    const dvMps = Math.min(4.5, Math.max(0.2, plan.dv || 1.85));
-    if (burnEl) burnEl.textContent = `${dvMps.toFixed(2)} m/s`;
-
-    const postDist = plan.postMiss ? Number(plan.postMiss).toFixed(2) : '7.80';
-    if (shiftEl) shiftEl.textContent = `Shift to ${postDist} km Safe ✓`;
+    const dvMps = plan.dvMs != null ? plan.dvMs : Math.min(4.5, Math.max(0.4, plan.dv || 1.85));
+    if (fuelEl) fuelEl.textContent = `${dvMps.toFixed(2)} m/s`;
   }
 
   public setRate(r: number): void {

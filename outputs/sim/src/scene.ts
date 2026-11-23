@@ -167,6 +167,7 @@ export class SceneView {
   public earthGroup: THREE.Group;
   public satGroup: THREE.Group;
   public dynamic: THREE.Group;
+  public arrowLayer: THREE.Group;
   public raycaster: THREE.Raycaster;
   public sunDir: THREE.Vector3 = new THREE.Vector3();
   public focusPoint: THREE.Vector3 = new THREE.Vector3();
@@ -254,6 +255,11 @@ export class SceneView {
     this.scene.add(this.satGroup);
     this.dynamic = new THREE.Group();
     this.scene.add(this.dynamic);
+    this.arrowLayer = new THREE.Group();
+    this.arrowLayer.name = 'arrowLayer';
+    this.arrowLayer.position.set(0, 0, 0);
+    this.arrowLayer.quaternion.identity();
+    this.scene.add(this.arrowLayer);
 
     this._buildEnvironment();
     this._buildOverlays();
@@ -486,11 +492,11 @@ export class SceneView {
     this.activeCollisions = [];
     this.sats.forEach(s => {
       if (s.blueVelArrow) {
-        this.dynamic.remove(s.blueVelArrow);
+        this.arrowLayer.remove(s.blueVelArrow);
         s.blueVelArrow.geometry.dispose();
       }
       if (s.greenAvoidArrow) {
-        this.dynamic.remove(s.greenAvoidArrow);
+        this.arrowLayer.remove(s.greenAvoidArrow);
         s.greenAvoidArrow.geometry.dispose();
       }
     });
@@ -642,7 +648,7 @@ export class SceneView {
         })
       );
       blueVelArrow.frustumCulled = false;
-      this.dynamic.add(blueVelArrow);
+      this.arrowLayer.add(blueVelArrow);
 
       const avoidGeo = createArrowGeometry();
       const greenAvoidArrow = new THREE.Mesh(
@@ -657,7 +663,7 @@ export class SceneView {
       );
       greenAvoidArrow.visible = false;
       greenAvoidArrow.frustumCulled = false;
-      this.dynamic.add(greenAvoidArrow);
+      this.arrowLayer.add(greenAvoidArrow);
 
       this.sats.push({
         group: g,
@@ -753,6 +759,8 @@ export class SceneView {
     avoidanceVec = null,
     avoidanceVisible = false,
     satLifecycles = [],
+    satTangents = [],
+    debrisTangents = [],
   }: {
     sats: (StateVector | null)[];
     debris: (number[] | null)[];
@@ -769,6 +777,8 @@ export class SceneView {
     avoidanceVec?: [number, number, number] | null;
     avoidanceVisible?: boolean;
     satLifecycles?: (LifecycleState | undefined)[];
+    satTangents?: (THREE.Vector3 | [number, number, number] | null)[];
+    debrisTangents?: (THREE.Vector3 | [number, number, number] | null)[];
   }): void {
     sats.forEach((st, i) => {
       const s = this.sats[i];
@@ -783,9 +793,18 @@ export class SceneView {
       const lifecycle = satLifecycles[i] || s.lifecycle || 'ACTIVE';
       s.lifecycle = lifecycle;
 
-      const isVisible = i < this.activeSats && lifecycle !== 'REMOVED';
+      const isDestroyed = lifecycle === 'DESTROYED' || lifecycle === 'REMOVED';
+      const isVisible = i < this.activeSats && !isDestroyed;
       s.group.visible = isVisible;
       if (s.orbit) s.orbit.visible = isVisible;
+
+      if (isDestroyed) {
+        if (s.blueVelArrow) s.blueVelArrow.visible = false;
+        if (s.greenAvoidArrow) s.greenAvoidArrow.visible = false;
+        if (s.beacon) s.beacon.visible = false;
+        if (s.label) s.label.visible = false;
+        return;
+      }
 
       // Dynamic Beacon Cross-Fade: smooth fade-out as camera enters micro-inspection range
       const camDist = this.camera.position.distanceTo(p);
@@ -795,16 +814,26 @@ export class SceneView {
 
       const arrowScale = THREE.MathUtils.clamp(camDist * 0.065, 0.22, 2.4);
 
-      // 1. Blue Default Velocity Arrow (Always visible on active satellites)
+      // 1. Blue Default Velocity Arrow (Oriented along exact world scene orbit tangent)
       if (s.blueVelArrow) {
-        if (isVisible && satVelocities[i]) {
-          const vScene = this._tmpVel.set(satVelocities[i]![0], satVelocities[i]![1], satVelocities[i]![2]).normalize();
-          s.blueVelArrow.position.copy(p).addScaledVector(vScene, 0.22);
-          s.blueVelArrow.quaternion.setFromUnitVectors(UP, vScene);
+        let tanBlue: THREE.Vector3 | null = null;
+        if (satTangents && satTangents[i]) {
+          const tRaw = satTangents[i]!;
+          tanBlue = Array.isArray(tRaw)
+            ? this._tmpVel.set(tRaw[0], tRaw[1], tRaw[2]).normalize()
+            : (tRaw as THREE.Vector3).clone().normalize();
+        } else if (satVelocities && satVelocities[i]) {
+          const v = satVelocities[i]!;
+          tanBlue = this._tmpVel.set(v[0] * KM, v[2] * KM, -v[1] * KM).normalize();
+        }
+
+        if (isVisible && tanBlue && tanBlue.lengthSq() > 1e-4) {
+          s.blueVelArrow.position.copy(p).addScaledVector(tanBlue, 0.22);
+          s.blueVelArrow.quaternion.setFromUnitVectors(UP, tanBlue);
           s.blueVelArrow.scale.set(arrowScale, arrowScale, arrowScale);
           const isTargetSat = (selected?.sat ?? 0) === i;
           const isDodgeActive = isTargetSat && avoidanceVisible && this._avoidPathOpacity > 0.01;
-          (s.blueVelArrow.material as THREE.MeshStandardMaterial).opacity = isDodgeActive ? 0.45 : 1.0;
+          (s.blueVelArrow.material as THREE.MeshStandardMaterial).opacity = isDodgeActive ? 0.35 : 1.0;
           s.blueVelArrow.visible = true;
         } else {
           s.blueVelArrow.visible = false;
@@ -894,18 +923,32 @@ export class SceneView {
       this.debrisInstancedMesh.instanceMatrix.needsUpdate = true;
     }
 
-    // Debris Velocity Arrows Instanced Rendering (1 draw call for all debris arrows, zero-allocation)
+    // Debris Velocity Arrows Instanced Rendering (World-space central difference tangents, 1 draw call)
     if (this.debrisArrowInstancedMesh) {
       const maxDeb = Math.min(this.activeDebris, debris.length);
       for (let i = 0; i < this.debris.length; i++) {
         const pKm = debris[i];
-        const vKm = debrisVelocities[i];
-        if (i < maxDeb && pKm && vKm) {
+        if (i < maxDeb && pKm) {
           this._dummyPos.set(pKm[0] * KM, pKm[2] * KM, -pKm[1] * KM);
-          this._vScene.set(vKm[0] * KM, vKm[2] * KM, -vKm[1] * KM).normalize();
-          this._dummyQuat.setFromUnitVectors(UP, this._vScene);
-          this._dummyScale.set(0.42, 0.42, 0.42);
-          this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._dummyScale);
+          let tanDeb: THREE.Vector3 | null = null;
+          if (debrisTangents && debrisTangents[i]) {
+            const tRaw = debrisTangents[i]!;
+            tanDeb = Array.isArray(tRaw)
+              ? this._vScene.set(tRaw[0], tRaw[1], tRaw[2]).normalize()
+              : (tRaw as THREE.Vector3).clone().normalize();
+          } else if (debrisVelocities && debrisVelocities[i]) {
+            const vKm = debrisVelocities[i]!;
+            tanDeb = this._vScene.set(vKm[0] * KM, vKm[2] * KM, -vKm[1] * KM).normalize();
+          }
+
+          if (tanDeb && tanDeb.lengthSq() > 1e-4) {
+            this._dummyQuat.setFromUnitVectors(UP, tanDeb);
+            this._dummyPos.addScaledVector(tanDeb, 0.12);
+            this._dummyScale.set(0.42, 0.42, 0.42);
+            this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._dummyScale);
+          } else {
+            this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._zeroScale);
+          }
         } else {
           this._dummyMat.compose(this._dummyPos, this._dummyQuat, this._zeroScale);
         }
@@ -990,10 +1033,25 @@ export class SceneView {
           col.shrapnelMesh.geometry.dispose();
 
           if (satObj) {
+            satObj.lifecycle = 'DESTROYED';
             satObj.group.visible = false;
             if (satObj.orbit) satObj.orbit.visible = false;
             if (satObj.blueVelArrow) satObj.blueVelArrow.visible = false;
             if (satObj.greenAvoidArrow) satObj.greenAvoidArrow.visible = false;
+            if (satObj.beacon) satObj.beacon.visible = false;
+            if (satObj.label) satObj.label.visible = false;
+          }
+          if (this.selectedDebrisMesh) {
+            this.selectedDebrisMesh.visible = false;
+          }
+          if (this.threatRing) {
+            this.threatRing.visible = false;
+          }
+          if (this.crashLine) {
+            this.crashLine.visible = false;
+          }
+          if (this.avoidLine) {
+            this.avoidLine.visible = false;
           }
 
           col.onComplete?.();
@@ -1245,6 +1303,19 @@ export class SceneView {
       shrapnelRot,
       onComplete,
     });
+  }
+
+  public purgeSatellite(index: number): void {
+    const s = this.sats[index];
+    if (!s) return;
+    s.lifecycle = 'REMOVED';
+    s.group.visible = false;
+    if (s.orbit) s.orbit.visible = false;
+    if (s.blueVelArrow) s.blueVelArrow.visible = false;
+    if (s.greenAvoidArrow) s.greenAvoidArrow.visible = false;
+    if (s.beacon) s.beacon.visible = false;
+    if (s.label) s.label.visible = false;
+    if (this.koGroup) this.koGroup.visible = false;
   }
 
   public firePlume(satIndex = 0): void {

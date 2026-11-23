@@ -25,26 +25,26 @@ test.describe('Dual Vector Arrows & True Collision Destruction Physics', () => {
 
   test('Test Crash triggers direct collision, impact announcement, and camera recovery', async ({ simPage }) => {
     const testCrashBtn = simPage.locator('#testCrashBtn');
-    const livePill = simPage.locator('#livePill');
     const autoDodgeLabel = simPage.locator('#autoDodgeLabel');
     const camModeTag = simPage.locator('#camModeTag');
+    const toast = simPage.locator('#toast');
 
     await expect(testCrashBtn).toBeVisible();
 
-    // Click TEST CRASH
+    // Click SIMULATE CRASH
     await testCrashBtn.click();
 
     // Auto-dodge should immediately switch to OFF
     await expect(autoDodgeLabel).toHaveText('OFF');
 
-    // Status pill should display direct intercept warning
-    await expect(livePill).toContainText('Direct Intercept Course');
+    // Toast displays direct collision simulation announcement
+    await expect(toast).toContainText('SIMULATING DIRECT COLLISION');
 
     // Camera switches to INSPECT VIEW to watch the incoming kinetic encounter
     await expect(camModeTag).toHaveText('INSPECT VIEW', { timeout: 8000 });
 
     // Wait for the physical collision & dissolution sequence
-    await expect(livePill).toContainText('Impact Confirmed', { timeout: 15000 });
+    await expect(toast).toContainText('KINETIC IMPACT', { timeout: 15000 });
 
     // After dissolution, camera automatically glides back to PLANET VIEW
     await expect(camModeTag).toHaveText('PLANET VIEW', { timeout: 15000 });

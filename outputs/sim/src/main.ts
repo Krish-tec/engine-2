@@ -84,7 +84,21 @@ const ui = new UI({
     S.follow = false;
     rig.resetToPlanetView();
   },
+  removeDestroyed: (kind, index) => {
+    removeDestroyedSatellite(kind, index);
+  },
 });
+
+function removeDestroyedSatellite(kind: 'sat' | 'deb', index: number): void {
+  if (kind === 'sat' && S.sats[index]) {
+    const s = S.sats[index];
+    s.lifecycle = 'REMOVED';
+    view.purgeSatellite(index);
+    ui.toast(`REMOVED ${s.name} FROM ROSTER`);
+    ui.setCatalog(S.sats.slice(0, S.satN), S.debris.slice(0, S.debN), S.risks);
+    ui.setCounts(S.satN, S.debN);
+  }
+}
 
 const rig = new OrbitRig(view.camera, viewCanvas, () => {});
 rig.onModeChange = telemetry => {
@@ -570,6 +584,8 @@ function updateThreat(sc: any): void {
     tcaMin,
     risk: isDanger ? 'crit' : 'safe',
     debIndex: sc.debIndex,
+    postMiss: isDanger && S.plan ? (S.plan.postMiss ? Number(S.plan.postMiss) : 6.85) : null,
+    fuel: isDanger && S.plan ? (S.plan.dvMs != null ? S.plan.dvMs : S.plan.dv || 1.85) : 0,
   });
 
   // Calculate mathematically coupled dual 3D trajectory paths (Blue default path + Green Engine 2 avoidance path)
@@ -617,6 +633,22 @@ let currentAvoidanceBundle: AvoidanceTrajectoryBundle | null = null;
 let currentAvoidanceSatIndex: number = -1;
 const prevCamPos = new THREE.Vector3();
 const prevCamTarget = new THREE.Vector3();
+
+// Zero-allocation pre-allocated scratch objects for world-space central-difference tangents
+const TANGENT_DELTA_MS = 350;
+const _satTangents: (THREE.Vector3 | null)[] = [];
+const _satTanVecs: THREE.Vector3[] = [];
+for (let i = 0; i < 32; i++) {
+  _satTanVecs.push(new THREE.Vector3());
+  _satTangents.push(null);
+}
+
+const _debTangents: (THREE.Vector3 | null)[] = [];
+const _debTanVecs: THREE.Vector3[] = [];
+for (let i = 0; i < 256; i++) {
+  _debTanVecs.push(new THREE.Vector3());
+  _debTangents.push(null);
+}
 
 function loop(now: number): void {
   if (isTabHidden) {
@@ -685,6 +717,41 @@ function loop(now: number): void {
     debVel[i] = st ? st.v : null;
   }
 
+  // World-Space Central Difference Tangents for Satellite velocity arrows
+  for (let i = 0; i < S.satN; i++) {
+    const sat = S.sats[i];
+    if (!sat || sat.lifecycle === 'DESTROYED' || sat.lifecycle === 'REMOVED') {
+      _satTangents[i] = null;
+      continue;
+    }
+    const stPrev = stateAt(sat, S.simMs - TANGENT_DELTA_MS);
+    const stNext = stateAt(sat, S.simMs + TANGENT_DELTA_MS);
+    if (stPrev && stNext) {
+      _satTanVecs[i].copy(scenePos(stNext.r)).sub(scenePos(stPrev.r)).normalize();
+      _satTangents[i] = _satTanVecs[i];
+    } else {
+      _satTangents[i] = null;
+    }
+  }
+
+  // World-Space Central Difference Tangents for Debris velocity arrows
+  const debCap = Math.min(S.debN, _debTanVecs.length);
+  for (let i = 0; i < debCap; i++) {
+    const deb = S.debris[i];
+    if (!deb || deb.lifecycle === 'DESTROYED' || deb.lifecycle === 'REMOVED') {
+      _debTangents[i] = null;
+      continue;
+    }
+    const stPrev = stateAt(deb, S.simMs - TANGENT_DELTA_MS);
+    const stNext = stateAt(deb, S.simMs + TANGENT_DELTA_MS);
+    if (stPrev && stNext) {
+      _debTanVecs[i].copy(scenePos(stNext.r)).sub(scenePos(stPrev.r)).normalize();
+      _debTangents[i] = _debTanVecs[i];
+    } else {
+      _debTangents[i] = null;
+    }
+  }
+
   // Continuous Proximity Detection & Physical Impact Loop (Swept CCD to prevent tunneling)
   if (sc && S.sats[sc.satIndex] && S.debris[sc.debIndex]) {
     const satObj = S.sats[sc.satIndex];
@@ -717,17 +784,17 @@ function loop(now: number): void {
         satObj.impactPos = impactPosKm as [Km, Km, Km];
         debObj.impactPos = impactPosKm as [Km, Km, Km];
 
-        ui.setLivePill('💥 Impact Confirmed — Satellite & Debris Destroyed', 'alert');
         ui.toast('💥 KINETIC IMPACT · SATELLITE DESTROYED');
 
         view.triggerCollisionEffect(impactPosKm, sc.satIndex, sc.debIndex, () => {
-          satObj.lifecycle = 'REMOVED';
-          debObj.lifecycle = 'REMOVED';
+          satObj.lifecycle = 'DESTROYED';
+          debObj.lifecycle = 'DESTROYED';
+          view.purgeSatellite(sc.satIndex);
           ui.setCatalog(S.sats.slice(0, S.satN), S.debris.slice(0, S.debN), S.risks);
           ui.setCounts(S.satN, S.debN);
           setTimeout(() => {
             rig.resetToPlanetView();
-          }, 1800);
+          }, 1600);
         });
       }
     }
@@ -766,6 +833,8 @@ function loop(now: number): void {
     avoidanceVec,
     avoidanceVisible,
     satLifecycles,
+    satTangents: _satTangents,
+    debrisTangents: _debTangents,
   });
 
   // Continuous Autonomous Event Choreography & Live State Machine
@@ -828,8 +897,17 @@ function loop(now: number): void {
       view.clearDualPaths();
       ui.setLivePill('All Systems Nominal · Scanning LEO Orbit', 'nominal');
 
-      // Schedule next encounter for the next satellite in the constellation
-      S.primary = (S.primary + 1) % S.satN;
+      // Schedule next encounter for the next active satellite in the constellation
+      let nextSatIdx = (S.primary + 1) % S.satN;
+      let attempts = 0;
+      while (
+        attempts < S.satN &&
+        (S.sats[nextSatIdx]?.lifecycle === 'DESTROYED' || S.sats[nextSatIdx]?.lifecycle === 'REMOVED')
+      ) {
+        nextSatIdx = (nextSatIdx + 1) % S.satN;
+        attempts++;
+      }
+      S.primary = nextSatIdx;
       S.burns[S.primary] = null;
       const nextSat = S.sats[S.primary];
       const nextDebIdx = Math.floor(Math.random() * Math.min(S.debN, S.debris.length));

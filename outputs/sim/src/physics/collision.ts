@@ -1,5 +1,6 @@
 import { norm, sub, add, scale, unit, dot } from './math';
 import type { LifecycleState } from '../types/orbital';
+export type { LifecycleState };
 
 /** Physical radius threshold for kinetic satellite-debris impact in km (80 meters) */
 export const COLLISION_RADIUS_KM = 0.08;

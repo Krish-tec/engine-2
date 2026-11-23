@@ -1,4 +1,5 @@
 import type { RiskLevel } from './riskClassifier';
+import type { LifecycleState } from '../types/orbital';
 
 export interface CatalogRowItem {
   kind: 'sat' | 'deb';
@@ -6,7 +7,7 @@ export interface CatalogRowItem {
   name: string;
   norad: number;
   risk: RiskLevel;
-  lifecycle?: 'ACTIVE' | 'COLLIDING' | 'DISSOLVING' | 'REMOVED';
+  lifecycle?: LifecycleState;
 }
 
 /**

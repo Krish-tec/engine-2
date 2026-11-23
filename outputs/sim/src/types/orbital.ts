@@ -1,7 +1,7 @@
 import type { Km, KmPerSecond, EpochMs, Probability, MetersPerSecond, Degrees, Radians } from './units';
 
 export type BodyKind = 'sat' | 'deb';
-export type LifecycleState = 'ACTIVE' | 'COLLIDING' | 'DISSOLVING' | 'REMOVED';
+export type LifecycleState = 'ACTIVE' | 'COLLIDING' | 'DISSOLVING' | 'DESTROYED' | 'REMOVED';
 
 export interface StateVector {
   r: [Km, Km, Km];

@@ -1,27 +1,27 @@
 import { test, expect } from './fixtures';
 
 test.describe('Flow 3: Conjunction Analysis', () => {
-  test('conjunction telemetry and B-plane canvas render properly', async ({ simPage }) => {
-    // Risk chip is rendered with an active risk status
-    const riskChip = simPage.locator('#riskChip');
-    await expect(riskChip).toBeVisible();
+  test('Swiss-minimal conjunction telemetry & KPI grid render properly', async ({ simPage }) => {
+    // Status badge is rendered with an active risk/safe status
+    const statusBadge = simPage.locator('#statusBadge');
+    await expect(statusBadge).toBeVisible();
 
-    // Protected asset name is rendered
-    const threatSat = simPage.locator('#threatSat');
-    await expect(threatSat).toBeVisible();
-    await expect(threatSat).not.toHaveText('—');
+    // Active conjunction pair line is rendered
+    const pairLabel = simPage.locator('#pairLabel');
+    await expect(pairLabel).toBeVisible();
+    await expect(pairLabel).not.toHaveText('—');
 
-    // Miss distance readout is populated
-    const threatMiss = simPage.locator('#threatMiss');
-    await expect(threatMiss).toBeVisible();
-    await expect(threatMiss).not.toHaveText('—');
+    // KPI grid cells are populated
+    const kpiMiss = simPage.locator('#kpiMiss');
+    await expect(kpiMiss).toBeVisible();
+    await expect(kpiMiss).not.toHaveText('—');
 
-    // B-plane canvas is present and has nonzero dimensions
-    const bplaneCanvas = simPage.locator('#bplane');
-    await expect(bplaneCanvas).toBeVisible();
-    const box = await bplaneCanvas.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.width).toBeGreaterThan(100);
-    expect(box!.height).toBeGreaterThan(100);
+    const kpiSpeed = simPage.locator('#kpiSpeed');
+    await expect(kpiSpeed).toBeVisible();
+    await expect(kpiSpeed).not.toHaveText('—');
+
+    const kpiFuel = simPage.locator('#kpiFuel');
+    await expect(kpiFuel).toBeVisible();
+    await expect(kpiFuel).not.toHaveText('—');
   });
 });

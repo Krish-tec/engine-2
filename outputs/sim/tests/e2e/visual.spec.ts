@@ -1,28 +1,19 @@
 import { test, expect } from './fixtures';
 
 test.describe('QuantumOrbit Sim - Visual Verification', () => {
-  test('b-plane canvas renders pixel content', async ({ simPage }) => {
-    const bplane = simPage.locator('#bplane');
-    await expect(bplane).toBeVisible();
+  test('Swiss-minimal right panel has zero vertical scroll overflow on standard 1280x800 viewport', async ({ simPage }) => {
+    await simPage.setViewportSize({ width: 1280, height: 800 });
 
-    // Verify canvas dimensions
-    const box = await bplane.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.width).toBeGreaterThanOrEqual(150);
-    expect(box!.height).toBeGreaterThanOrEqual(150);
+    const panel = simPage.locator('.panel');
+    await expect(panel).toBeVisible();
 
-    // Verify canvas has drawn data by reading data URL from canvas
-    const hasDrawn = await simPage.evaluate(() => {
-      const cvs = document.getElementById('bplane') as HTMLCanvasElement;
-      if (!cvs) return false;
-      const ctx = cvs.getContext('2d');
-      if (!ctx) return false;
-      const imgData = ctx.getImageData(0, 0, cvs.width, cvs.height);
-      // Ensure canvas is not completely blank (has non-zero pixels)
-      return imgData.data.some((channel) => channel !== 0);
-    });
+    const scrollInfo = await panel.evaluate((el) => ({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+    }));
 
-    expect(hasDrawn).toBe(true);
+    // Panel content should fit within desktop viewport without mandatory scrolling
+    expect(scrollInfo.scrollHeight).toBeLessThanOrEqual(scrollInfo.clientHeight + 2);
   });
 
   test('theme toggle switches visual styling classes', async ({ simPage }) => {

@@ -5,10 +5,10 @@ test.describe('Flow 1: Load and Render', () => {
     const viewCanvas = simPage.locator('#view');
     await expect(viewCanvas).toBeVisible();
 
-    // Verify live event status pill is populated
-    const livePill = simPage.locator('#livePill');
-    await expect(livePill).toBeVisible();
-    await expect(livePill).not.toBeEmpty();
+    // Verify Swiss-minimal status badge is populated with valid state
+    const statusBadge = simPage.locator('#statusBadge');
+    await expect(statusBadge).toBeVisible();
+    await expect(statusBadge).toHaveText(/SAFE|RISK/);
 
     // Verify loading overlay has disappeared
     const loading = simPage.locator('#loading');
